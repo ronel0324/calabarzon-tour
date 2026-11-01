@@ -88,9 +88,15 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.infoSection}>
           <Text style={styles.infoTitle}>About CALABARZON</Text>
           <Text style={styles.infoText}>
-            Region IV-A (CALABARZON) comprises the provinces of Cavite, Laguna, 
-            Batangas, Rizal, and Quezon. This region is known for its rich history, 
-            diverse culture, and natural wonders.
+            Region IV-A (CALABARZON), officially designated as Region IV-A, stands as the most populous and economically dynamic 
+            administrative region in the Philippines. Situated immediately southeast of Metro Manila, this contiguous landmass derives its unique 
+            name from the acronym of its five constituent provinces: Cavite, Laguna, Batangas, Rizal, and Quezon. The region seamlessly bridges 
+            he gap between rapid urban modernization and preserved natural heritage, hosting massive industrial parks, high-tech manufacturing hubs, 
+            and vital shipping ports alongside lush agricultural fields and protected mountain ranges. Beyond its massive economic contribution as a 
+            manufacturing engine for the country, CALABARZON is steeped in profound cultural and historical significance. It is the birthplace of 
+            national heroes like Jose Rizal and Emilio Aguinaldo, the cradle of early Philippine independence, and a sanctuary for traditional arts. 
+            Its diverse landscape—characterized by calm inland lakes, rugged volcanic ridges like Tagaytay, and expansive coastlines—makes it a 
+            primary destination for ecotourism and a vital gateway to southern Luzon.
           </Text>
         </View>
       </View>
