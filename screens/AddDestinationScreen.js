@@ -177,7 +177,7 @@ export default function AddDestinationScreen({ navigation }) {
               onChangeText={(text) => handleInputChange('name', text)}
             />
 
-            <Text style={styles.label}>Category * (pwede more than one)</Text>
+            <Text style={styles.label}>Category * (multiple)</Text>
             <View style={styles.categoryContainer}>
               {CATEGORIES.map((category) => {
                 const selected = formData.categories.includes(category);
@@ -273,8 +273,7 @@ export default function AddDestinationScreen({ navigation }) {
             {/* ---- 360° SECTION ---- */}
             <Text style={styles.label}>360° Image (optional)</Text>
             <Text style={styles.helperText}>
-              Dapat 2:1 ang ratio (hal. 4096×2048), galing sa 360 camera o Photo Sphere.
-              Hanggang 50 MB lang ang kayang i-upload.
+              The ratio must be 2:1 (e.g., 4096×2048), coming from a 360 camera or Photo Sphere. The upload limit is up to 50 MB.
             </Text>
             <TouchableOpacity style={styles.panoramaButton} onPress={handlePickPanorama}>
               <Text style={styles.panoramaButtonText}>

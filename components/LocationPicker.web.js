@@ -27,8 +27,7 @@ export default function LocationPicker({ latitude, longitude, onChange }) {
     <View>
       <Text style={styles.label}>Location *</Text>
       <Text style={styles.helperText}>
-        Sa web, i-type ang coordinates. Sa Google Maps, i-right-click ang lugar at i-click ang
-        numbers sa taas para makopya (hal. 14.2136, 121.1667).
+        On the web, type the coordinates. On Google Maps, right-click the location and click "What's here?" to get the coordinates.
       </Text>
 
       <Text style={styles.subLabel}>Latitude</Text>
