@@ -13,16 +13,24 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  // Alert.alert ay hindi gumagana sa web, kaya ipakita ang mensahe sa mismong form
+  const notify = (title, text) => {
+    if (Platform.OS === 'web') setMessage(`${title}: ${text}`);
+    else Alert.alert(title, text);
+  };
 
   const isRegister = mode === 'register';
 
   const submit = async () => {
+    setMessage(null);
     if (!email.trim() || !password) {
-      return Alert.alert('Oops', 'Fill in your email and password.');
+      return notify('Oops', 'Fill in your email and password.');
     }
     if (isRegister) {
-      if (password.length < 6) return Alert.alert('Oops', 'Password must be at least 6 characters.');
-      if (password !== confirm) return Alert.alert('Oops', 'Passwords do not match.');
+      if (password.length < 6) return notify('Oops', 'Password must be at least 6 characters.');
+      if (password !== confirm) return notify('Oops', 'Passwords do not match.');
     }
 
     setBusy(true);
@@ -30,10 +38,10 @@ export default function AuthScreen() {
     setBusy(false);
 
     if (error) {
-      return Alert.alert(isRegister ? 'Register failed' : 'Login failed', error.message);
+      return notify(isRegister ? 'Register failed' : 'Login failed', error.message);
     }
     if (isRegister && !data.session) {
-      Alert.alert('Check your email', 'We sent a confirmation link. Confirm it, then log in.');
+      notify('Check your email', 'We sent a confirmation link. Confirm it, then log in.');
       setMode('login');
     }
     // Kapag may session na, AuthContext na ang bahala -> Home
@@ -81,6 +89,8 @@ export default function AuthScreen() {
               />
             )}
 
+            {message ? <Text style={styles.message}>{message}</Text> : null}
+
             <TouchableOpacity
               style={[styles.btn, busy && { opacity: 0.6 }]}
               onPress={submit}
@@ -94,7 +104,7 @@ export default function AuthScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => setMode(isRegister ? 'login' : 'register')}>
+            <TouchableOpacity onPress={() => { setMessage(null); setMode(isRegister ? 'login' : 'register'); }}>
               <Text style={styles.link}>
                 {isRegister ? 'Already have an account? Login' : 'No account yet? Register'}
               </Text>
@@ -119,6 +129,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: COLORS.line, backgroundColor: COLORS.white,
     borderRadius: 10, padding: 14, marginBottom: 12, fontSize: 16, color: COLORS.ink
   },
+  message: { color: COLORS.vermilion || '#B8372F', marginBottom: 12, lineHeight: 20 },
   btn: { backgroundColor: COLORS.taal, padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 4 },
   btnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
   link: { color: COLORS.goldDeep || COLORS.gold, textAlign: 'center', marginTop: 18, fontWeight: '600' }
