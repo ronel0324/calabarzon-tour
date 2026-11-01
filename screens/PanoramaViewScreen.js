@@ -32,6 +32,7 @@ import {
   deletePanoramaConnection
 } from '../services/database';
 import { resolvePanorama } from '../utils/panoramaAssets';
+import { useAuth } from '../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -55,11 +56,10 @@ const confirmAction = (title, message, confirmText, onConfirm) => {
   }
 };
 
-// Palitan mo ito ng tunay na check (hal. isAdmin) para admin lang ang may Edit mode.
-const CAN_EDIT = true;
-
 const PanoramaViewScreen = ({ route, navigation }) => {
   const { destinationId, destinationName, entryPointId } = route.params;
+  const { isAdmin } = useAuth();
+  const CAN_EDIT = isAdmin;
 
   const [currentPoint, setCurrentPoint] = useState(null);
   const [connections, setConnections] = useState([]);
@@ -164,7 +164,7 @@ const PanoramaViewScreen = ({ route, navigation }) => {
   };
 
   const handleHotspotPress = (hotspot) => {
-    if (editMode) {
+    if (CAN_EDIT && editMode) {
       // Sa edit mode, ang pindot sa pulang arrow ay pagbura (hindi paglipat)
       confirmAction(
         'Burahin ang arrow?',
@@ -192,7 +192,7 @@ const PanoramaViewScreen = ({ route, navigation }) => {
   // ---------- Info hotspot handlers ----------
 
   const handleInfoHotspotPress = (hotspot) => {
-    if (editMode) {
+    if (CAN_EDIT && editMode) {
       openEditForm(hotspot);
     } else {
       setSelectedInfo(hotspot);
@@ -203,7 +203,7 @@ const PanoramaViewScreen = ({ route, navigation }) => {
   const afterModal = (fn) => setTimeout(fn, Platform.OS === 'ios' ? 350 : 0);
 
   const handlePlaceHotspot = ({ yaw, pitch }) => {
-    // Tap sa larawan habang edit mode -> tanungin kung Info o Link
+    if (!CAN_EDIT) return;
     setDraft({ yaw, pitch });
     setChooserVisible(true);
   };
@@ -455,7 +455,7 @@ const PanoramaViewScreen = ({ route, navigation }) => {
           initialRotation={currentPoint.rotation}
           onHotspotPress={handleHotspotPress}
           infoHotspots={infoHotspots}
-          editMode={editMode}
+          editMode={CAN_EDIT && editMode}
           draft={draft}
           onInfoHotspotPress={handleInfoHotspotPress}
           onPlaceHotspot={handlePlaceHotspot}
