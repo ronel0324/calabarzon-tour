@@ -153,6 +153,7 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
             ))}
           </View>
+        </View>
 
         <View style={styles.content}>
           {/* About */}
