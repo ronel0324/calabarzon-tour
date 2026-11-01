@@ -51,6 +51,26 @@ const getPinColor = (category) => {
   return categoryColors[first] || categoryColors['Other'];
 };
 
+// Mga pagpipilian sa filter
+const PROVINCES = ['All', 'Cavite', 'Laguna', 'Batangas', 'Rizal', 'Quezon'];
+const CATEGORY_OPTIONS = ['All', ...Object.keys(categoryColors)];
+
+// Province: tinitingnan ang `province` field (kung meron) at ang address ng destination
+const matchesProvince = (dest, province) => {
+  if (province === 'All') return true;
+  const text = `${dest.province || ''} ${dest.address || ''}`.toLowerCase();
+  return text.includes(province.toLowerCase());
+};
+
+// Category: kaya ang maraming category sa isang destination (hal. "Beach, Mountain")
+const matchesCategory = (dest, category) => {
+  if (category === 'All') return true;
+  return (dest.category || '')
+    .split(',')
+    .map((c) => c.trim())
+    .includes(category);
+};
+
 // Format ng layo at oras para sa route card
 const formatDistance = (meters) => {
   if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
@@ -105,7 +125,7 @@ const buildMapHtml = () => `
       window.ReactNativeWebView.postMessage(JSON.stringify(data));
     }
 
-    window.setDestinations = function (list) {
+    window.setDestinations = function (list, fit) {
       markersLayer.clearLayers();
       list.forEach(function (d) {
         var icon = L.divIcon({
@@ -121,6 +141,16 @@ const buildMapHtml = () => `
             send({ type: 'marker', id: d.id });
           });
       });
+
+      // Kapag nagbago ang filter, i-zoom ang mapa sa mga natirang pin
+      if (fit && list.length > 0) {
+        if (list.length === 1) {
+          map.flyTo([list[0].latitude, list[0].longitude], 11, { duration: 0.8 });
+        } else {
+          var pts = list.map(function (d) { return [d.latitude, d.longitude]; });
+          map.flyToBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: 12, duration: 0.8 });
+        }
+      }
     };
 
     window.setUserLocation = function (lat, lng, fly) {
@@ -170,6 +200,10 @@ const MapScreen = ({ navigation }) => {
   const [selectedHasPanorama, setSelectedHasPanorama] = useState(false);
   const [route, setRoute] = useState(null); // { name, distance, duration }
   const [routeLoading, setRouteLoading] = useState(false);
+  const [selectedProvince, setSelectedProvince] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const filterKeyRef = useRef('All|All');
   const webViewRef = useRef(null);
 
   // FIX: kunin ang laki ng system bars (home button / gesture bar) at ng screen
@@ -188,17 +222,33 @@ const MapScreen = ({ navigation }) => {
     loadDestinations();
   }, []);
 
-  // Ipadala ang destinations sa map kapag ready na ang map at may data
+  // Destinations na pasok sa napiling province at category
+  const filteredDestinations = useMemo(
+    () =>
+      destinations.filter(
+        (d) =>
+          matchesProvince(d, selectedProvince) && matchesCategory(d, selectedCategory)
+      ),
+    [destinations, selectedProvince, selectedCategory]
+  );
+
+  // Ipadala ang (filtered) destinations sa map kapag ready na ang map at may data
   useEffect(() => {
     if (!mapReady) return;
-    const payload = destinations.map((d) => ({
+    const payload = filteredDestinations.map((d) => ({
       id: d.id,
       latitude: Number(d.latitude),
       longitude: Number(d.longitude),
       color: getPinColor(d.category)
     }));
-    runInMap(`window.setDestinations(${JSON.stringify(payload)})`);
-  }, [mapReady, destinations]);
+
+    // i-zoom lang ang mapa kapag filter ang nagbago (hindi kapag nag-reload)
+    const key = `${selectedProvince}|${selectedCategory}`;
+    const filterChanged = filterKeyRef.current !== key;
+    filterKeyRef.current = key;
+
+    runInMap(`window.setDestinations(${JSON.stringify(payload)}, ${filterChanged})`);
+  }, [mapReady, filteredDestinations]);
 
   // Kunin ang lokasyon ng user kapag ready na ang map
   useEffect(() => {
@@ -361,6 +411,49 @@ const MapScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
+        {/* Filter bar: province chips + category dropdown button */}
+        <View style={styles.filterBar}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.chipScroll}
+            contentContainerStyle={styles.chipRow}
+          >
+            {PROVINCES.map((province) => {
+              const active = selectedProvince === province;
+              return (
+                <TouchableOpacity
+                  key={province}
+                  style={[styles.chip, active && styles.chipActive]}
+                  onPress={() => setSelectedProvince(province)}
+                >
+                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                    {province}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={[
+              styles.categoryButton,
+              selectedCategory !== 'All' && styles.categoryButtonActive
+            ]}
+            onPress={() => setShowCategoryMenu((v) => !v)}
+          >
+            <Text
+              style={[
+                styles.categoryButtonText,
+                selectedCategory !== 'All' && styles.categoryButtonTextActive
+              ]}
+              numberOfLines={1}
+            >
+              {selectedCategory === 'All' ? 'Category' : selectedCategory} ▾
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Map area (map + buttons + counter) */}
         <View style={styles.mapWrapper}>
           {/* Map View (Leaflet + OpenStreetMap) */}
@@ -396,9 +489,52 @@ const MapScreen = ({ navigation }) => {
           {/* Destination Counter */}
           <View style={styles.counterContainer}>
             <Text style={styles.counterText}>
-              📍 {destinations.length} Destinations
+              📍 {filteredDestinations.length} Destinations
             </Text>
           </View>
+
+          {/* Category dropdown (nasa loob ng map area para gumana ang touch) */}
+          {showCategoryMenu && (
+            <>
+              <TouchableOpacity
+                activeOpacity={1}
+                style={StyleSheet.absoluteFillObject}
+                onPress={() => setShowCategoryMenu(false)}
+              />
+              <View style={styles.categoryMenu}>
+                <ScrollView>
+                  {CATEGORY_OPTIONS.map((cat) => {
+                    const active = selectedCategory === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[styles.categoryItem, active && styles.categoryItemActive]}
+                        onPress={() => {
+                          setSelectedCategory(cat);
+                          setShowCategoryMenu(false);
+                        }}
+                      >
+                        {cat !== 'All' && (
+                          <View
+                            style={[
+                              styles.categoryDot,
+                              { backgroundColor: categoryColors[cat] }
+                            ]}
+                          />
+                        )}
+                        <Text
+                          style={[styles.categoryItemText, active && styles.categoryItemTextActive]}
+                        >
+                          {cat === 'All' ? 'All Categories' : cat}
+                        </Text>
+                        {active && <Text style={styles.categoryCheck}>✓</Text>}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </>
+          )}
 
           {/* Loading habang kinukuha ang ruta */}
           {routeLoading && (
@@ -591,6 +727,105 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#333'
+  },
+  filterBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingLeft: 10,
+    paddingRight: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ddd'
+  },
+  chipScroll: {
+    flex: 1
+  },
+  chipRow: {
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 8
+  },
+  chip: {
+    backgroundColor: '#F0F0F0',
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 16
+  },
+  chipActive: {
+    backgroundColor: '#4CAF50'
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#555'
+  },
+  chipTextActive: {
+    color: '#fff'
+  },
+  categoryButton: {
+    maxWidth: 140,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16
+  },
+  categoryButtonActive: {
+    backgroundColor: '#4CAF50'
+  },
+  categoryButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2E7D32'
+  },
+  categoryButtonTextActive: {
+    color: '#fff'
+  },
+  categoryMenu: {
+    position: 'absolute',
+    top: 0,
+    right: 10,
+    width: 210,
+    maxHeight: 340,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 8
+  },
+  categoryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14
+  },
+  categoryItemActive: {
+    backgroundColor: '#E8F5E9'
+  },
+  categoryDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10
+  },
+  categoryItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333'
+  },
+  categoryItemTextActive: {
+    fontWeight: '700',
+    color: '#2E7D32'
+  },
+  categoryCheck: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2E7D32'
   },
   routeLoading: {
     position: 'absolute',
