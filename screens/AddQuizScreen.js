@@ -27,9 +27,9 @@ export default function AddQuizScreen({ route }) {
     setOptions((prev) => prev.map((o, idx) => (idx === i ? value : o)));
 
   const save = async () => {
-    if (!destinationId) return Alert.alert('Walang napiling destination');
-    if (!question.trim()) return Alert.alert('Isulat ang tanong');
-    if (options.some((o) => !o.trim())) return Alert.alert('Kumpletuhin ang 4 na choices');
+    if (!destinationId) return Alert.alert('No destination selected');
+    if (!question.trim()) return Alert.alert('Please write the question');
+    if (options.some((o) => !o.trim())) return Alert.alert('Please complete all 4 choices');
 
     setSaving(true);
     const { error } = await supabase.from('quiz_questions').insert({
@@ -43,8 +43,8 @@ export default function AddQuizScreen({ route }) {
     });
     setSaving(false);
 
-    if (error) return Alert.alert('Hindi na-save', error.message);
-    Alert.alert('Na-save na ang tanong');
+    if (error) return Alert.alert('Not Saved.', error.message);
+    Alert.alert('Question saved.');
     setQuestion('');
     setOptions(['', '', '', '']);
     setCorrectIndex(0);
@@ -57,10 +57,10 @@ export default function AddQuizScreen({ route }) {
         <Text style={styles.destText}>{destinationName || `ID: ${destinationId}`}</Text>
       </View>
 
-      <Text style={styles.label}>Tanong</Text>
+      <Text style={styles.label}>Question</Text>
       <TextInput style={styles.input} value={question} onChangeText={setQuestion} multiline />
 
-      <Text style={styles.label}>Mga Choices (pindutin ang bilog para sa tamang sagot)</Text>
+      <Text style={styles.label}>Options (tap the circle for the correct answer)</Text>
       {options.map((opt, i) => (
         <View key={i} style={styles.optionRow}>
           <TouchableOpacity onPress={() => setCorrectIndex(i)} style={styles.radio}>
@@ -76,7 +76,7 @@ export default function AddQuizScreen({ route }) {
       ))}
 
       <TouchableOpacity style={styles.saveBtn} onPress={save} disabled={saving}>
-        <Text style={styles.saveText}>{saving ? 'Sine-save...' : 'I-save ang Tanong'}</Text>
+        <Text style={styles.saveText}>{saving ? 'Saving...' : 'Save Question'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
