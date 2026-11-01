@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
 
+const SITE_URL = 'https://calabarzon-tour.netlify.app/';
+
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
@@ -48,7 +50,11 @@ export function AuthProvider({ children }) {
 
   // Laging 'viewer' ang bagong register (database trigger ang nagse-set)
   const signUp = (email, password) =>
-    supabase.auth.signUp({ email: email.trim(), password });
+    supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: { emailRedirectTo: `${SITE_URL}/confirmed.html` }
+    });
 
   const signOut = () => supabase.auth.signOut();
 
