@@ -1,0 +1,217 @@
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  SafeAreaView
+} from 'react-native';
+
+export default function HomeScreen({ navigation }) {
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+      <View style={styles.header}>
+           <Image
+              source={require('../assets//calabarzon.png')}
+              style={styles.headerImage}
+              resizeMode="cover"
+            />
+
+      </View>
+
+      <View style={styles.content}>
+        <Text style={styles.welcomeText}>
+          Explore the rich cultural heritage and tourist destinations of Region IV-A
+        </Text>
+
+        <View style={styles.menuContainer}>
+          <TouchableOpacity
+            style={[styles.menuButton, styles.highlightedButton]}
+            onPress={() => navigation.navigate('Map')}
+          >
+            <View style={styles.menuIcon}>
+              <Text style={styles.menuIconText}>🗺️</Text>
+            </View>
+            <Text style={styles.menuButtonText}>Map View</Text>
+            <Text style={styles.menuButtonSubtext}>
+              View all destinations on map
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate('DestinationList')}
+          >
+            <View style={styles.menuIcon}>
+              <Text style={styles.menuIconText}>📍</Text>
+            </View>
+            <Text style={styles.menuButtonText}>Browse Destinations</Text>
+            <Text style={styles.menuButtonSubtext}>
+              Explore tourist spots and cultural sites
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate('AddDestination')}
+          >
+            <View style={styles.menuIcon}>
+              <Text style={styles.menuIconText}>➕</Text>
+            </View>
+            <Text style={styles.menuButtonText}>Add Destination</Text>
+            <Text style={styles.menuButtonSubtext}>
+              Contribute a new location
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => navigation.navigate('Progress')}
+          >
+            <View style={styles.menuIcon}>
+              <Text style={styles.menuIconText}>📊</Text>
+            </View>
+            <Text style={styles.menuButtonText}>My Progress</Text>
+            <Text style={styles.menuButtonSubtext}>
+              View completed tours and quiz scores
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.infoSection}>
+          <Text style={styles.infoTitle}>About CALABARZON</Text>
+          <Text style={styles.infoText}>
+            Region IV-A (CALABARZON) comprises the provinces of Cavite, Laguna, 
+            Batangas, Rizal, and Quezon. This region is known for its rich history, 
+            diverse culture, and natural wonders.
+          </Text>
+        </View>
+      </View>
+    </ScrollView>
+  </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#4CAF50', // Match header color
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20, // Reduced since SafeAreaView handles the spacing
+  },
+  header: {
+    height: 250,
+    position: 'relative',
+  },
+  headerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: '#fff',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+  content: {
+    padding: 20,
+  },
+  welcomeText: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#666',
+    marginBottom: 30,
+    lineHeight: 24,
+  },
+  menuContainer: {
+    marginBottom: 30,
+  },
+  menuButton: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  highlightedButton: {
+    backgroundColor: '#E3F2FD',
+    borderWidth: 2,
+    borderColor: '#2196F3',
+  },
+  menuIcon: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  menuIconText: {
+    fontSize: 30,
+  },
+  menuButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  menuButtonSubtext: {
+    fontSize: 14,
+    color: '#666',
+  },
+  infoSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  infoTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 22,
+  },
+});
