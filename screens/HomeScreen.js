@@ -10,6 +10,7 @@ import {
   Platform,
   useWindowDimensions
 } from 'react-native';
+import { useAuth } from '../context/AuthContext';
 
 // Palette: hango sa Taal Lake, sa ginto ng araw sa watawat, at sa kulay ng Pahiyas
 const COLORS = {
@@ -48,7 +49,8 @@ const MENU_ITEMS = [
     icon: '➕',
     title: 'Add Destination',
     subtitle: 'Contribute a new location',
-    route: 'AddDestination'
+    route: 'AddDestination',
+    adminOnly: true
   },
   {
     key: 'progress',
@@ -81,6 +83,8 @@ const WeaveBand = () => {
 
 export default function HomeScreen({ navigation }) {
   const [aboutExpanded, setAboutExpanded] = useState(false);
+  const { isAdmin, user, signOut } = useAuth();
+  const visibleMenu = MENU_ITEMS.filter((item) => !item.adminOnly || isAdmin);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -133,7 +137,7 @@ export default function HomeScreen({ navigation }) {
           {/* Menu list */}
           <Text style={styles.sectionTitle}>Explore</Text>
           <View style={styles.menuList}>
-            {MENU_ITEMS.map((item, index) => (
+            {visibleMenu.map((item, index) => (
               <TouchableOpacity
                 key={item.key}
                 style={[styles.menuRow, index > 0 && styles.menuRowDivider]}
@@ -195,6 +199,16 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.readMore}>{aboutExpanded ? 'Show less' : 'Read more'}</Text>
             </TouchableOpacity>
           </View>
+
+          <View style={styles.content}>
+          <Text style={{ color: COLORS.muted, fontSize: 13, textAlign: 'center' }}>
+            {user?.email} · {isAdmin ? 'Admin' : 'Viewer'}
+          </Text>
+          <TouchableOpacity onPress={signOut} style={{ alignItems: 'center', paddingVertical: 14 }}>
+            <Text style={{ color: COLORS.vermilion, fontWeight: '700' }}>Logout</Text>
+          </TouchableOpacity>
+        </View>
+
         </View>
 
         <WeaveBand />
