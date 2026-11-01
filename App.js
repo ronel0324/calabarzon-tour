@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { initDatabase, seedSampleData, seedPanoramaData } from './services/database';
 import { updateDestinationsWithCoordinates } from './services/updateDestinationsWithCoordinates';
 import { supabase } from './services/supabase';
+import { COLORS, SERIF } from './theme';
 
 // Import screens
 import HomeScreen from './screens/HomeScreen';
@@ -48,21 +49,31 @@ export default function App() {
   // Huwag i-render ang mga screen hangga't hindi pa handa ang database
   if (!dbReady) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: COLORS.paper
+        }}
+      >
+        <ActivityIndicator size="large" color={COLORS.taal} />
       </View>
     );
   }
 
   return (
     <NavigationContainer>
-      <StatusBar style="dark" />
+      {/* "light" dahil madilim na teal ang header */}
+      <StatusBar style="light" backgroundColor={COLORS.taal} />
       <Stack.Navigator
         initialRouteName="Home"
         screenOptions={{
-          headerStyle: { backgroundColor: '#4CAF50' },
-          headerTintColor: '#fff',
-          headerTitleStyle: { fontWeight: 'bold' },
+          headerStyle: { backgroundColor: COLORS.taal },
+          headerTintColor: COLORS.white,
+          headerTitleStyle: { fontFamily: SERIF, fontWeight: '700' },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: COLORS.paper }
         }}
       >
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'CALABARZON Virtual Tour' }} />
