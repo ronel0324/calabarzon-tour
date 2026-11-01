@@ -63,6 +63,7 @@ function RootNavigator() {
               <>
                 <Stack.Screen name="AddDestination" component={AddDestinationScreen} options={{ title: 'Add Destination' }} />
                 <Stack.Screen name="EditDestination" component={EditDestinationScreen} options={{ title: 'Edit Destination' }} />
+                <Stack.Screen name="AddQuiz" component={AddQuizScreen} options={{ title: 'Add Quiz' }} />
               </>
             )}
           </>
