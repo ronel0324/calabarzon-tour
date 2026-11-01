@@ -19,6 +19,7 @@ import {
   deleteDestination
 } from '../services/database';
 import styles from '../styles/listStyles';
+import { useAuth } from '../context/AuthContext';
 
 const CATEGORIES = [
   'All',
@@ -36,6 +37,7 @@ export default function DestinationListScreen({ navigation }) {
   const [destinations, setDestinations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const { isAdmin } = useAuth();
 
   const loadDestinations = async () => {
     try {
@@ -71,6 +73,7 @@ export default function DestinationListScreen({ navigation }) {
 
   // Hiwalay na function para sa actual na pagbura
   const performDelete = async (id) => {
+    if (!isAdmin) return;
     try {
       console.log('Deleting id:', id);
       await deleteDestination(id);
@@ -139,6 +142,7 @@ export default function DestinationListScreen({ navigation }) {
         </View>
       </TouchableOpacity>
 
+      {isAdmin && (
       <View style={styles.cardActions}>
         <TouchableOpacity
           style={styles.editButton}
@@ -153,6 +157,7 @@ export default function DestinationListScreen({ navigation }) {
           <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
+    )}
     </View>
   );
 
@@ -208,12 +213,14 @@ export default function DestinationListScreen({ navigation }) {
         {destinations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No destinations found</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => navigation.navigate('AddDestination')}
-            >
-              <Text style={styles.addButtonText}>Add Your First Destination</Text>
-            </TouchableOpacity>
+            {isAdmin && (
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => navigation.navigate('AddDestination')}
+              >
+                <Text style={styles.addButtonText}>Add Your First Destination</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <FlatList
