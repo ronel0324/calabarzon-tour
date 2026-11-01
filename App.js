@@ -18,6 +18,7 @@ import EditDestinationScreen from './screens/EditDestinationScreen';
 import ProgressScreen from './screens/ProgressScreen';
 import MapScreen from './screens/MapScreen';
 import PanoramaViewScreen from './screens/PanoramaViewScreen';
+import AddQuizScreen from './screens/AddQuizScreen';
 
 const Stack = createNativeStackNavigator();
 
