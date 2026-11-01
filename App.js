@@ -18,6 +18,7 @@ import EditDestinationScreen from './screens/EditDestinationScreen';
 import ProgressScreen from './screens/ProgressScreen';
 import MapScreen from './screens/MapScreen';
 import PanoramaViewScreen from './screens/PanoramaViewScreen';
+import AddQuizScreen from './screens/AddQuizScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -62,6 +63,7 @@ function RootNavigator() {
               <>
                 <Stack.Screen name="AddDestination" component={AddDestinationScreen} options={{ title: 'Add Destination' }} />
                 <Stack.Screen name="EditDestination" component={EditDestinationScreen} options={{ title: 'Edit Destination' }} />
+                <Stack.Screen name="AddQuiz" component={AddQuizScreen} options={{ title: 'Add Quiz' }} />
               </>
             )}
           </>
