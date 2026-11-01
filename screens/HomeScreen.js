@@ -59,29 +59,6 @@ const MENU_ITEMS = [
   }
 ];
 
-const PROVINCE_HIGHLIGHTS = [
-  {
-    name: 'Cavite',
-    text: 'Aguinaldo Shrine in Kawit, where independence was proclaimed in 1898.'
-  },
-  {
-    name: 'Laguna',
-    text: 'Pila, a historic town of preserved ancestral houses around a plaza.'
-  },
-  {
-    name: 'Batangas',
-    text: 'Taal Heritage Town and the view of Taal Volcano and its lake.'
-  },
-  {
-    name: 'Rizal',
-    text: 'Angono, home of the Petroglyphs and known as the art capital.'
-  },
-  {
-    name: 'Quezon',
-    text: 'Lucban and the Pahiyas Festival, when houses are covered in colorful kiping.'
-  }
-];
-
 // Hinabing banig na border: hilera ng maliliit na diamond, ang tanging palamuti ng screen
 const WeaveBand = () => {
   const { width } = useWindowDimensions();
@@ -176,23 +153,6 @@ export default function HomeScreen({ navigation }) {
               </TouchableOpacity>
             ))}
           </View>
-
-          {/* Heritage highlights */}
-          <Text style={styles.sectionTitle}>Heritage in five provinces</Text>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.provinceRow}
-        >
-          {PROVINCE_HIGHLIGHTS.map((p) => (
-            <View key={p.name} style={styles.provinceCard}>
-              <Text style={styles.provinceName}>{p.name}</Text>
-              <Text style={styles.provinceText}>{p.text}</Text>
-            </View>
-          ))}
-        </ScrollView>
 
         <View style={styles.content}>
           {/* About */}
