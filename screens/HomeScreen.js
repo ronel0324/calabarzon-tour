@@ -6,10 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  SafeAreaView,
   Platform,
   useWindowDimensions
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 
 // Palette: hango sa Taal Lake, sa ginto ng araw sa watawat, at sa kulay ng Pahiyas
