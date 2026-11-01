@@ -81,8 +81,8 @@ export default function App() {
       try {
         // magkakasunod, hintayin ang bawat isa
         await initDatabase();
-        await seedSampleData();
-        await seedPanoramaData();
+        //await seedSampleData();
+        //await seedPanoramaData();
       } catch (error) {
         console.error('Database setup error:', error);
       }
