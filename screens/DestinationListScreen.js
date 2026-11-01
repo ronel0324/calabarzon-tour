@@ -21,6 +21,7 @@ import {
 import styles from '../styles/listStyles';
 import { useAuth } from '../context/AuthContext';
 
+
 const CATEGORIES = [
   'All',
   'Natural Wonder',
@@ -152,12 +153,14 @@ export default function DestinationListScreen({ navigation }) {
         </TouchableOpacity>
                 <TouchableOpacity
           style={styles.editButton}
-          onPress={() =>
+          onPress={() => {
+            console.log('Add Quiz pressed:', item.id, item.name);
+            console.log('Registered routes:', navigation.getState().routeNames);
             navigation.navigate('AddQuiz', {
               destinationId: item.id,
               destinationName: item.name
-            })
-          }
+            });
+          }}
         >
           <Text style={styles.editButtonText}>Add Quiz</Text>
         </TouchableOpacity>
