@@ -58,14 +58,6 @@ const MENU_ITEMS = [
     title: 'My Progress',
     subtitle: 'Completed tours and quiz scores',
     route: 'Progress'
-  },
-  {
-    key: 'addquiz',
-    icon: '📝',
-    title: 'Add Quiz',
-    subtitle: 'Create questions for a destination',
-    route: 'AddQuiz',
-    adminOnly: true
   }
 ];
 

@@ -150,6 +150,17 @@ export default function DestinationListScreen({ navigation }) {
         >
           <Text style={styles.editButtonText}>Edit</Text>
         </TouchableOpacity>
+                <TouchableOpacity
+          style={styles.editButton}
+          onPress={() =>
+            navigation.navigate('AddQuiz', {
+              destinationId: item.id,
+              destinationName: item.name
+            })
+          }
+        >
+          <Text style={styles.editButtonText}>Add Quiz</Text>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDelete(item.id, item.name)}

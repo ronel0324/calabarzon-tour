@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -12,27 +12,22 @@ import { supabase } from '../services/supabase';
 
 const LETTERS = ['a', 'b', 'c', 'd'];
 
-export default function AddQuizScreen() {
-  const [destinations, setDestinations] = useState([]);
-  const [destinationId, setDestinationId] = useState(null);
+// Binubuksan mula sa DestinationListScreen:
+// navigation.navigate('AddQuiz', { destinationId: item.id, destinationName: item.name })
+export default function AddQuizScreen({ route }) {
+  const destinationId = route?.params?.destinationId;
+  const destinationName = route?.params?.destinationName;
+
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '', '', '']);
   const [correctIndex, setCorrectIndex] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    supabase
-      .from('destinations')
-      .select('id, name')
-      .order('name')
-      .then(({ data }) => setDestinations(data || []));
-  }, []);
-
   const setOption = (i, value) =>
     setOptions((prev) => prev.map((o, idx) => (idx === i ? value : o)));
 
   const save = async () => {
-    if (!destinationId) return Alert.alert('Pumili ng destination');
+    if (!destinationId) return Alert.alert('Walang napiling destination');
     if (!question.trim()) return Alert.alert('Isulat ang tanong');
     if (options.some((o) => !o.trim())) return Alert.alert('Kumpletuhin ang 4 na choices');
 
@@ -56,18 +51,10 @@ export default function AddQuizScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.label}>Destination</Text>
-      <View style={styles.chips}>
-        {destinations.map((d) => (
-          <TouchableOpacity
-            key={d.id}
-            style={[styles.chip, destinationId === d.id && styles.chipActive]}
-            onPress={() => setDestinationId(d.id)}
-          >
-            <Text style={destinationId === d.id ? styles.chipTextActive : null}>{d.name}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.destBox}>
+        <Text style={styles.destText}>{destinationName || `ID: ${destinationId}`}</Text>
       </View>
 
       <Text style={styles.label}>Tanong</Text>
@@ -98,6 +85,12 @@ export default function AddQuizScreen() {
 const styles = StyleSheet.create({
   container: { padding: 20, backgroundColor: '#F5F6F1' },
   label: { fontWeight: '700', color: '#1D2A2E', marginTop: 16, marginBottom: 8 },
+  destBox: {
+    backgroundColor: '#E3EEE5',
+    borderRadius: 10,
+    padding: 12
+  },
+  destText: { fontWeight: '700', color: '#0E3B43' },
   input: {
     backgroundColor: '#fff',
     borderWidth: 1,
@@ -105,17 +98,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12
   },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E1E3DA',
-    backgroundColor: '#fff'
-  },
-  chipActive: { backgroundColor: '#0E3B43', borderColor: '#0E3B43' },
-  chipTextActive: { color: '#fff' },
   optionRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
   radio: {
     width: 24,
