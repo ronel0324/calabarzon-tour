@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -7,6 +6,7 @@ import { initDatabase, seedSampleData, seedPanoramaData } from './services/datab
 import { updateDestinationsWithCoordinates } from './services/updateDestinationsWithCoordinates';
 import { COLORS, SERIF } from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import AppSplash from './components/AppSplash';
 
 // Import screens
 import AuthScreen from './screens/AuthScreen';
@@ -22,16 +22,10 @@ import AddQuizScreen from './screens/AddQuizScreen';
 
 const Stack = createNativeStackNavigator();
 
-const Loading = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.paper }}>
-    <ActivityIndicator size="large" color={COLORS.taal} />
-  </View>
-);
-
 function RootNavigator() {
   const { session, isAdmin, loading: authLoading } = useAuth();
 
-  if (authLoading) return <Loading />;
+  if (authLoading) return <AppSplash />;
 
   return (
     <NavigationContainer>
@@ -75,6 +69,12 @@ function RootNavigator() {
 
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
+  const [minTimePassed, setMinTimePassed] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setMinTimePassed(true), 2000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     const setup = async () => {
@@ -100,7 +100,7 @@ export default function App() {
   }, []);
 
   // Huwag i-render ang mga screen hangga't hindi pa handa ang database
-  if (!dbReady) return <Loading />;
+  if (!dbReady || !minTimePassed) return <AppSplash />;
 
   return (
     <AuthProvider>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   Platform,
   useWindowDimensions,
   SafeAreaView,
-  ActivityIndicator
+  ActivityIndicator,
+  TextInput,
+  Keyboard
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapWebView from '../components/MapWebView';
@@ -24,6 +26,15 @@ const CALABARZON_CENTER = { latitude: 14.1008, longitude: 121.0794, zoom: 9 };
 // Masyadong mabilis ang oras na binibigay ng OSRM (ideal na bilis, walang traffic).
 // Ginagawang multiplier para mas realistic. Taasan kung mabilis pa rin, ibaba kung bagal na.
 const TRAFFIC_FACTOR = 1.7;
+
+// Naka-labas sa component para hindi nagbabago ang reference sa bawat render
+const ORIGIN_WHITELIST = ['*'];
+
+const renderMapLoading = () => (
+  <View style={styles.loading}>
+    <ActivityIndicator size="large" color="#4CAF50" />
+  </View>
+);
 
 // Alert.alert ay hindi gumagana sa web, kaya window.alert doon
 const notify = (title, message) => {
@@ -87,6 +98,7 @@ const formatDuration = (seconds) => {
 };
 
 // Leaflet + OpenStreetMap (walang API key na kailangan)
+// Optimized: canvas markers + clustering + diff update
 const buildMapHtml = () => `
 <!DOCTYPE html>
 <html>
@@ -94,62 +106,139 @@ const buildMapHtml = () => `
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
   <style>
     html, body, #map { height: 100%; margin: 0; padding: 0; }
-    .pin {
-      width: 36px; height: 36px; border-radius: 18px;
-      border: 3px solid #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.4);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 18px;
-    }
     .me {
       width: 16px; height: 16px; border-radius: 8px;
       background: #1976D2; border: 3px solid #fff;
       box-shadow: 0 0 0 4px rgba(25,118,210,0.3);
     }
+    .pin-wrap svg { display: block; }
+    .leaflet-marker-icon { will-change: transform; }
   </style>
 </head>
 <body>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: false }).setView([${CALABARZON_CENTER.latitude}, ${CALABARZON_CENTER.longitude}], ${CALABARZON_CENTER.zoom});
+    var map = L.map('map', {
+      zoomControl: false,
+      preferCanvas: true,
+      renderer: L.canvas({ padding: 0.3, tolerance: 8 }),
+      fadeAnimation: false,
+      markerZoomAnimation: false,
+      zoomAnimation: false,
+      inertia: false,
+      keyboard: false,
+      boxZoom: false
+    }).setView([${CALABARZON_CENTER.latitude}, ${CALABARZON_CENTER.longitude}], ${CALABARZON_CENTER.zoom});
+
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
+      maxZoom: 17,
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      keepBuffer: 0,
+      detectRetina: false,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    var markersLayer = L.layerGroup().addTo(map);
+    // Hugis ng pin (viewBox 36x48): bilog sa taas, matulis sa ilalim
+    var PIN_PATH = 'M18 1C8.6 1 1 8.6 1 18c0 12.5 17 29 17 29s17-16.5 17-29C35 8.6 27.4 1 18 1z';
+
+    // Clustering: pinagsasama ang magkakalapit na pin kapag naka-zoom out
+    var cluster = L.markerClusterGroup({
+      chunkedLoading: true,
+      maxClusterRadius: 80,
+      disableClusteringAtZoom: 14,
+      spiderfyOnMaxZoom: false,
+      showCoverageOnHover: false,
+      animate: false,
+      removeOutsideVisibleBounds: true,
+      iconCreateFunction: function (c) {
+        var n = c.getChildCount();
+        var w = n < 10 ? 38 : n < 50 ? 44 : 50;
+        var h = Math.round(w * 4 / 3);
+        var fs = n < 10 ? 13 : n < 100 ? 12 : 10;
+        var svg =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 36 48">' +
+          '<path d="' + PIN_PATH + '" fill="#2E7D32" stroke="#fff" stroke-width="2"/>' +
+          '<circle cx="18" cy="18" r="11" fill="#fff"/>' +
+          '<text x="18" y="18" text-anchor="middle" dominant-baseline="central" font-family="sans-serif" font-weight="700" font-size="' + fs + '" fill="#1B5E20">' + n + '</text>' +
+          '</svg>';
+        return L.divIcon({
+          html: svg,
+          className: 'pin-wrap',
+          iconSize: [w, h],
+          iconAnchor: [w / 2, h]
+        });
+      }
+    });
+    map.addLayer(cluster);
+
+    var markers = {};   // id -> marker
     var meMarker = null;
+
+    // Isang icon bawat kulay, ginagamit ulit (cached) para magaan
+    var iconCache = {};
+    function pinIcon(color) {
+      if (iconCache[color]) return iconCache[color];
+      var svg =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="30" height="40" viewBox="0 0 36 48">' +
+        '<path d="' + PIN_PATH + '" fill="' + color + '" stroke="#fff" stroke-width="2"/>' +
+        '<circle cx="18" cy="18" r="7" fill="#fff"/>' +
+        '</svg>';
+      iconCache[color] = L.icon({
+        iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg),
+        iconSize: [30, 40],
+        iconAnchor: [15, 40]
+      });
+      return iconCache[color];
+    }
     var routeLayer = null;
 
     function send(data) {
       window.ReactNativeWebView.postMessage(JSON.stringify(data));
     }
 
+    // Idagdag/alisin lang ang nagbago, hindi ginagawa ulit ang lahat
     window.setDestinations = function (list, fit) {
-      markersLayer.clearLayers();
+      var next = {};
+      var toAdd = [];
+
       list.forEach(function (d) {
-        var icon = L.divIcon({
-          className: '',
-          html: '<div class="pin" style="background:' + d.color + '">📍</div>',
-          iconSize: [36, 36],
-          iconAnchor: [18, 18]
+        next[d.id] = true;
+        var existing = markers[d.id];
+        if (existing) {
+          if (existing._color !== d.color) {
+            existing.setIcon(pinIcon(d.color));
+            existing._color = d.color;
+          }
+          return;
+        }
+        var m = L.marker([d.latitude, d.longitude], { icon: pinIcon(d.color), riseOnHover: false, keyboard: false });
+        m._color = d.color;
+        m.on('click', function () {
+          map.setView([d.latitude, d.longitude], Math.max(map.getZoom(), 12), { animate: true, duration: 0.4 });
+          send({ type: 'marker', id: d.id });
         });
-        L.marker([d.latitude, d.longitude], { icon: icon })
-          .addTo(markersLayer)
-          .on('click', function () {
-            map.flyTo([d.latitude, d.longitude], 12, { duration: 0.6 });
-            send({ type: 'marker', id: d.id });
-          });
+        markers[d.id] = m;
+        toAdd.push(m);
       });
+
+      var toRemove = [];
+      for (var id in markers) {
+        if (!next[id]) { toRemove.push(markers[id]); delete markers[id]; }
+      }
+      if (toRemove.length) cluster.removeLayers(toRemove);
+      if (toAdd.length) cluster.addLayers(toAdd);
 
       // Kapag nagbago ang filter, i-zoom ang mapa sa mga natirang pin
       if (fit && list.length > 0) {
         if (list.length === 1) {
-          map.flyTo([list[0].latitude, list[0].longitude], 11, { duration: 0.8 });
+          map.setView([list[0].latitude, list[0].longitude], 11, { animate: true, duration: 0.5 });
         } else {
           var pts = list.map(function (d) { return [d.latitude, d.longitude]; });
-          map.flyToBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: 12, duration: 0.8 });
+          map.fitBounds(L.latLngBounds(pts), { padding: [60, 60], maxZoom: 12, animate: true, duration: 0.5 });
         }
       }
     };
@@ -158,7 +247,7 @@ const buildMapHtml = () => `
       var icon = L.divIcon({ className: '', html: '<div class="me"></div>', iconSize: [22, 22], iconAnchor: [11, 11] });
       if (meMarker) { meMarker.setLatLng([lat, lng]); }
       else { meMarker = L.marker([lat, lng], { icon: icon, interactive: false }).addTo(map); }
-      if (fly) { map.flyTo([lat, lng], 10, { duration: 1 }); }
+      if (fly) { map.setView([lat, lng], 10, { animate: true, duration: 0.6 }); }
     };
 
     // Iguhit ang ruta. coords ay galing sa OSRM: [[lng, lat], ...]
@@ -167,8 +256,8 @@ const buildMapHtml = () => `
       var latlngs = coords.map(function (c) { return [c[1], c[0]]; });
       routeLayer = L.layerGroup();
       // puting outline sa ilalim para kita sa kahit anong kulay ng mapa
-      L.polyline(latlngs, { color: '#fff', weight: 9, opacity: 0.9 }).addTo(routeLayer);
-      L.polyline(latlngs, { color: '#1976D2', weight: 5, opacity: 1 }).addTo(routeLayer);
+      L.polyline(latlngs, { color: '#fff', weight: 9, opacity: 0.9, smoothFactor: 2 }).addTo(routeLayer);
+      L.polyline(latlngs, { color: '#1976D2', weight: 5, opacity: 1, smoothFactor: 2 }).addTo(routeLayer);
       routeLayer.addTo(map);
       map.fitBounds(L.latLngBounds(latlngs), {
         paddingTopLeft: [40, 40],
@@ -177,14 +266,16 @@ const buildMapHtml = () => `
     };
 
     window.clearRoute = function () {
-      if (routeLayer) {
-        map.removeLayer(routeLayer);
-        routeLayer = null;
-      }
+      if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+    };
+
+    // Lipad sa napiling destination
+    window.focusOn = function (lat, lng) {
+      map.setView([lat, lng], 15, { animate: true, duration: 0.6 });
     };
 
     window.centerMap = function () {
-      map.flyTo([${CALABARZON_CENTER.latitude}, ${CALABARZON_CENTER.longitude}], ${CALABARZON_CENTER.zoom}, { duration: 1 });
+      map.setView([${CALABARZON_CENTER.latitude}, ${CALABARZON_CENTER.longitude}], ${CALABARZON_CENTER.zoom}, { animate: true, duration: 0.6 });
     };
 
     send({ type: 'ready' });
@@ -192,6 +283,158 @@ const buildMapHtml = () => `
 </body>
 </html>
 `;
+
+// Styles ng hamburger menu at filter panel (hiwalay para hindi galawin ang mapStyles.js)
+const menuStyles = StyleSheet.create({
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0'
+  },
+  menuButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F3F4',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  bar: {
+    width: 20,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: '#333',
+    marginVertical: 2.5
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: '#E53935',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  searchBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F3F4',
+    paddingHorizontal: 14
+  },
+  searchIcon: { fontSize: 14, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 15, color: '#263238', paddingVertical: 0 },
+  searchClear: { fontSize: 16, color: '#78909C', paddingLeft: 8 },
+  suggestions: {
+    position: 'absolute',
+    top: 8,
+    left: 10,
+    right: 10,
+    zIndex: 30,
+    elevation: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden'
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECEFF1'
+  },
+  suggestionName: { fontSize: 15, fontWeight: '600', color: '#263238' },
+  suggestionAddr: { fontSize: 12, color: '#78909C', marginTop: 1 },
+  noResult: { padding: 14, color: '#78909C', fontSize: 14 },
+
+  overlay: { flex: 1, flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.45)' },
+  backdrop: { flex: 1 },
+  panel: {
+    width: '82%',
+    maxWidth: 340,
+    backgroundColor: '#fff',
+    paddingHorizontal: 18
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14
+  },
+  panelTitle: { fontSize: 20, fontWeight: '700', color: '#263238' },
+  closeX: { fontSize: 20, color: '#607D8B' },
+  panelBody: { flex: 1 },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#90A4AE',
+    letterSpacing: 1,
+    marginBottom: 10
+  },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#CFD8DC',
+    backgroundColor: '#fff',
+    marginRight: 8,
+    marginBottom: 8
+  },
+  chipActive: { backgroundColor: '#2E7D32', borderColor: '#2E7D32' },
+  chipText: { fontSize: 14, color: '#455A64' },
+  chipTextActive: { color: '#fff', fontWeight: '700' },
+  catRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 10,
+    borderRadius: 10
+  },
+  catRowActive: { backgroundColor: '#E8F5E9' },
+  catDot: { width: 14, height: 14, borderRadius: 7, marginRight: 12 },
+  catText: { flex: 1, fontSize: 15, color: '#37474F' },
+  catTextActive: { fontWeight: '700', color: '#1B5E20' },
+  catCheck: { fontSize: 16, color: '#2E7D32', fontWeight: '700' },
+  panelFooter: {
+    flexDirection: 'row',
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#ECEFF1'
+  },
+  footerReset: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#CFD8DC',
+    marginRight: 10,
+    justifyContent: 'center'
+  },
+  footerResetText: { color: '#546E7A', fontWeight: '600' },
+  footerDone: {
+    flex: 1,
+    backgroundColor: '#2E7D32',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  footerDoneText: { color: '#fff', fontWeight: '700' }
+});
 
 const MapScreen = ({ navigation }) => {
   const [destinations, setDestinations] = useState([]);
@@ -203,15 +446,31 @@ const MapScreen = ({ navigation }) => {
   const [routeLoading, setRouteLoading] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [showCategoryMenu, setShowCategoryMenu] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const activeFilterCount =
+    (selectedProvince !== 'All' ? 1 : 0) + (selectedCategory !== 'All' ? 1 : 0);
+
+  const resetFilters = () => {
+    setSelectedProvince('All');
+    setSelectedCategory('All');
+  };
   const filterKeyRef = useRef('All|All');
   const webViewRef = useRef(null);
 
-  // FIX: kunin ang laki ng system bars (home button / gesture bar) at ng screen
+  // Laki ng system bars (home button / gesture bar) at ng screen
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
 
-  const mapHtml = useMemo(() => buildMapHtml(), []);
+  // Isang beses lang gagawin ang source para hindi nagre-reload ang WebView
+  const mapSource = useMemo(() => ({ html: buildMapHtml() }), []);
+
+  // Mabilis na hanapan ng destination kapag may na-tap na pin
+  const destinationsById = useMemo(() => {
+    const m = new Map();
+    destinations.forEach((d) => m.set(String(d.id), d));
+    return m;
+  }, [destinations]);
 
   const runInMap = (js) => {
     if (webViewRef.current) {
@@ -232,6 +491,33 @@ const MapScreen = ({ navigation }) => {
       ),
     [destinations, selectedProvince, selectedCategory]
   );
+
+  // Search: hanapin sa pangalan o address (lahat ng destinations, hindi lang yung filtered)
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    const starts = [];
+    const contains = [];
+    destinations.forEach((d) => {
+      const name = (d.name || '').toLowerCase();
+      const addr = (d.address || '').toLowerCase();
+      if (name.startsWith(q)) starts.push(d);
+      else if (name.includes(q) || addr.includes(q)) contains.push(d);
+    });
+    return [...starts, ...contains].slice(0, 6);
+  }, [searchQuery, destinations]);
+
+  const handleSelectSearch = (dest) => {
+    Keyboard.dismiss();
+    setSearchQuery('');
+    // Kung natatakpan ng filter ang pin, alisin muna ang filter
+    const visible = filteredDestinations.some((d) => String(d.id) === String(dest.id));
+    if (!visible) resetFilters();
+    setTimeout(
+      () => runInMap(`window.focusOn(${Number(dest.latitude)}, ${Number(dest.longitude)})`),
+      visible ? 0 : 400
+    );
+  };
 
   // Ipadala ang (filtered) destinations sa map kapag ready na ang map at may data
   useEffect(() => {
@@ -261,14 +547,11 @@ const MapScreen = ({ navigation }) => {
   const loadDestinations = async () => {
     try {
       const allDestinations = await getAllDestinations();
-      console.log('📍 Total destinations:', allDestinations.length);
 
       // Filter destinations that have coordinates
       const destinationsWithCoords = allDestinations.filter(
         (dest) => dest.latitude && dest.longitude
       );
-
-      console.log('📍 Destinations with coordinates:', destinationsWithCoords.length);
 
       setDestinations(destinationsWithCoords);
 
@@ -297,7 +580,13 @@ const MapScreen = ({ navigation }) => {
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      // Kapag background na pagkuha (hindi button), gamitin ang last known para mabilis
+      const location =
+        (!showAlert && (await Location.getLastKnownPositionAsync())) ||
+        (await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced
+        }));
+
       runInMap(
         `window.setUserLocation(${location.coords.latitude}, ${location.coords.longitude}, ${showAlert})`
       );
@@ -306,25 +595,31 @@ const MapScreen = ({ navigation }) => {
     }
   };
 
-  const handleMessage = async (event) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
+  const handleMessage = useCallback(
+    async (event) => {
+      try {
+        const data = JSON.parse(event.nativeEvent.data);
 
-      if (data.type === 'ready') {
-        setMapReady(true);
-      } else if (data.type === 'marker') {
-        const destination = destinations.find((d) => d.id === data.id);
-        if (destination) {
+        if (data.type === 'ready') {
+          setMapReady(true);
+        } else if (data.type === 'marker') {
+          const destination = destinationsById.get(String(data.id));
+          if (!destination) return;
+
+          // Ilabas agad ang modal, saka hintayin ang panorama check
           setSelectedDestination(destination);
+          setSelectedHasPanorama(false);
+          setShowInfoModal(true);
+
           const entry = await getEntryPanoramaPoint(destination.id);
           setSelectedHasPanorama(!!entry);
-          setShowInfoModal(true);
         }
+      } catch (error) {
+        console.error('Error handling map message:', error);
       }
-    } catch (error) {
-      console.error('Error handling map message:', error);
-    }
-  };
+    },
+    [destinationsById]
+  );
 
   const handleViewDetails = () => {
     setShowInfoModal(false);
@@ -364,7 +659,9 @@ const MapScreen = ({ navigation }) => {
         return;
       }
 
-      const loc = await Location.getCurrentPositionAsync({});
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced
+      });
       const from = loc.coords;
       const toLat = Number(dest.latitude);
       const toLng = Number(dest.longitude);
@@ -412,47 +709,47 @@ const MapScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Filter bar: province chips + category dropdown button */}
-        <View style={styles.filterBar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.chipScroll}
-            contentContainerStyle={styles.chipRow}
-          >
-            {PROVINCES.map((province) => {
-              const active = selectedProvince === province;
-              return (
-                <TouchableOpacity
-                  key={province}
-                  style={[styles.chip, active && styles.chipActive]}
-                  onPress={() => setSelectedProvince(province)}
-                >
-                  <Text style={[styles.chipText, active && styles.chipTextActive]}>
-                    {province}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
+        {/* Top bar: hamburger menu (nasa loob ang filters) */}
+        <View style={menuStyles.topBar}>
           <TouchableOpacity
-            style={[
-              styles.categoryButton,
-              selectedCategory !== 'All' && styles.categoryButtonActive
-            ]}
-            onPress={() => setShowCategoryMenu((v) => !v)}
+            style={menuStyles.menuButton}
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowMenu(true);
+            }}
+            accessibilityLabel="Open filters"
           >
-            <Text
-              style={[
-                styles.categoryButtonText,
-                selectedCategory !== 'All' && styles.categoryButtonTextActive
-              ]}
-              numberOfLines={1}
-            >
-              {selectedCategory === 'All' ? 'Category' : selectedCategory} ▾
-            </Text>
+            <View style={menuStyles.bar} />
+            <View style={menuStyles.bar} />
+            <View style={menuStyles.bar} />
+            {activeFilterCount > 0 && (
+              <View style={menuStyles.badge}>
+                <Text style={menuStyles.badgeText}>{activeFilterCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
+
+          <View style={menuStyles.searchBox}>
+            <Text style={menuStyles.searchIcon}>🔍</Text>
+            <TextInput
+              style={menuStyles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search destination..."
+              placeholderTextColor="#90A4AE"
+              returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="none"
+              onSubmitEditing={() => {
+                if (searchResults.length > 0) handleSelectSearch(searchResults[0]);
+              }}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={10}>
+                <Text style={menuStyles.searchClear}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Map area (map + buttons + counter) */}
@@ -461,17 +758,13 @@ const MapScreen = ({ navigation }) => {
           <MapWebView
             ref={webViewRef}
             style={styles.map}
-            originWhitelist={['*']}
-            source={{ html: mapHtml }}
+            originWhitelist={ORIGIN_WHITELIST}
+            source={mapSource}
             onMessage={handleMessage}
             javaScriptEnabled={true}
             domStorageEnabled={true}
             startInLoadingState={true}
-            renderLoading={() => (
-              <View style={styles.loading}>
-                <ActivityIndicator size="large" color="#4CAF50" />
-              </View>
-            )}
+            renderLoading={renderMapLoading}
           />
 
           {/* Control Buttons */}
@@ -494,47 +787,38 @@ const MapScreen = ({ navigation }) => {
             </Text>
           </View>
 
-          {/* Category dropdown (nasa loob ng map area para gumana ang touch) */}
-          {showCategoryMenu && (
-            <>
-              <TouchableOpacity
-                activeOpacity={1}
-                style={StyleSheet.absoluteFillObject}
-                onPress={() => setShowCategoryMenu(false)}
-              />
-              <View style={styles.categoryMenu}>
-                <ScrollView>
-                  {CATEGORY_OPTIONS.map((cat) => {
-                    const active = selectedCategory === cat;
-                    return (
-                      <TouchableOpacity
-                        key={cat}
-                        style={[styles.categoryItem, active && styles.categoryItemActive]}
-                        onPress={() => {
-                          setSelectedCategory(cat);
-                          setShowCategoryMenu(false);
-                        }}
-                      >
-                        {cat !== 'All' && (
-                          <View
-                            style={[
-                              styles.categoryDot,
-                              { backgroundColor: categoryColors[cat] }
-                            ]}
-                          />
-                        )}
-                        <Text
-                          style={[styles.categoryItemText, active && styles.categoryItemTextActive]}
-                        >
-                          {cat === 'All' ? 'All Categories' : cat}
+          {/* Search suggestions */}
+          {searchQuery.trim().length > 0 && (
+            <View style={menuStyles.suggestions}>
+              {searchResults.length === 0 ? (
+                <Text style={menuStyles.noResult}>Walang nahanap</Text>
+              ) : (
+                searchResults.map((d, i) => (
+                  <TouchableOpacity
+                    key={String(d.id)}
+                    style={[
+                      menuStyles.suggestionRow,
+                      i === searchResults.length - 1 && { borderBottomWidth: 0 }
+                    ]}
+                    onPress={() => handleSelectSearch(d)}
+                  >
+                    <View
+                      style={[menuStyles.catDot, { backgroundColor: getPinColor(d.category) }]}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={menuStyles.suggestionName} numberOfLines={1}>
+                        {d.name}
+                      </Text>
+                      {!!d.address && (
+                        <Text style={menuStyles.suggestionAddr} numberOfLines={1}>
+                          {d.address}
                         </Text>
-                        {active && <Text style={styles.categoryCheck}>✓</Text>}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            </>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </View>
           )}
 
           {/* Loading habang kinukuha ang ruta */}
@@ -565,7 +849,7 @@ const MapScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Legend: nasa ilalim na ng mapa (hindi na nakalutang), at may espasyo para sa home button */}
+        {/* Legend: nasa ilalim na ng mapa, at may espasyo para sa home button */}
         <View
           style={[
             styles.legendContainer,
@@ -582,6 +866,95 @@ const MapScreen = ({ navigation }) => {
             ))}
           </ScrollView>
         </View>
+
+        {/* Hamburger menu: side panel na may Province at Category filters */}
+        <Modal
+          visible={showMenu}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowMenu(false)}
+        >
+          <View style={menuStyles.overlay}>
+            <View
+              style={[
+                menuStyles.panel,
+                { paddingTop: insets.top + 12, paddingBottom: 12 + insets.bottom }
+              ]}
+            >
+              <View style={menuStyles.panelHeader}>
+                <Text style={menuStyles.panelTitle}>Filters</Text>
+                <TouchableOpacity onPress={() => setShowMenu(false)} hitSlop={10}>
+                  <Text style={menuStyles.closeX}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={menuStyles.panelBody} showsVerticalScrollIndicator={false}>
+                <Text style={menuStyles.sectionLabel}>PROVINCE</Text>
+                <View style={menuStyles.chipWrap}>
+                  {PROVINCES.map((province) => {
+                    const active = selectedProvince === province;
+                    return (
+                      <TouchableOpacity
+                        key={province}
+                        style={[menuStyles.chip, active && menuStyles.chipActive]}
+                        onPress={() => setSelectedProvince(province)}
+                      >
+                        <Text style={[menuStyles.chipText, active && menuStyles.chipTextActive]}>
+                          {province}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <Text style={[menuStyles.sectionLabel, { marginTop: 18 }]}>CATEGORY</Text>
+                {CATEGORY_OPTIONS.map((cat) => {
+                  const active = selectedCategory === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      style={[menuStyles.catRow, active && menuStyles.catRowActive]}
+                      onPress={() => setSelectedCategory(cat)}
+                    >
+                      {cat !== 'All' ? (
+                        <View
+                          style={[menuStyles.catDot, { backgroundColor: categoryColors[cat] }]}
+                        />
+                      ) : (
+                        <View style={[menuStyles.catDot, { backgroundColor: '#B0BEC5' }]} />
+                      )}
+                      <Text style={[menuStyles.catText, active && menuStyles.catTextActive]}>
+                        {cat === 'All' ? 'All Categories' : cat}
+                      </Text>
+                      {active && <Text style={menuStyles.catCheck}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              <View style={menuStyles.panelFooter}>
+                <TouchableOpacity style={menuStyles.footerReset} onPress={resetFilters}>
+                  <Text style={menuStyles.footerResetText}>Reset</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={menuStyles.footerDone}
+                  onPress={() => setShowMenu(false)}
+                >
+                  <Text style={menuStyles.footerDoneText}>
+                    Show {filteredDestinations.length} destinations
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Pindutin ang madilim na bahagi para isara */}
+            <TouchableOpacity
+              style={menuStyles.backdrop}
+              activeOpacity={1}
+              onPress={() => setShowMenu(false)}
+            />
+          </View>
+        </Modal>
 
         {/* Info Modal */}
         <Modal

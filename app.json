@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": { "backgroundColor": "#0f4a28" },
     "plugins": [
       [
         "expo-location",
