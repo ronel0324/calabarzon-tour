@@ -110,17 +110,55 @@ const PROVINCE_TOWNS = {
   ]
 };
 
-// Tugma lang kung buong salita (hindi nasa gitna ng ibang salita)
-const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const hasWord = (text, word) =>
-  new RegExp(`(^|[^a-z])${escapeRegex(normalize(word))}([^a-z]|$)`).test(text);
+const PROVINCE_NAMES = Object.keys(PROVINCE_TOWNS);
 
-// Province: tinitingnan ang `province` field (kung meron), ang address, at ang mga bayan
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// "Rizal St.", "Quezon Ave", "Laguna Blvd" ay pangalan ng kalye, hindi province
+const STREET_SUFFIX =
+  '(?:st|street|ave|avenue|rd|road|blvd|boulevard|highway|hwy|ext|extension|drive|dr|lane)(?![a-z])';
+const stripStreetNames = (text) =>
+  text.replace(
+    new RegExp(
+      `(^|[^a-z])(?:${PROVINCE_NAMES.map(normalize).join('|')})\\s+${STREET_SUFFIX}\\.?`,
+      'g'
+    ),
+    '$1 '
+  );
+
+// Posisyon ng huling buong-salita na tugma (-1 kung wala)
+const lastIndexOfWord = (text, word) => {
+  const re = new RegExp(`(^|[^a-z])${escapeRegex(normalize(word))}(?![a-z])`, 'g');
+  let last = -1;
+  let m;
+  while ((m = re.exec(text)) !== null) last = m.index + m[1].length;
+  return last;
+};
+
+// Alamin ang province ng destination: 1) `province` field, 2) huling lugar sa address
+const getProvinceOf = (dest) => {
+  const explicit = PROVINCE_NAMES.find((p) => normalize(p) === normalize(dest.province));
+  if (explicit) return explicit;
+
+  const text = stripStreetNames(normalize(dest.address));
+  let best = null;
+  let bestPos = -1;
+  PROVINCE_NAMES.forEach((p) => {
+    [p, ...PROVINCE_TOWNS[p]].forEach((word) => {
+      const pos = lastIndexOfWord(text, word);
+      const isOwnName = word === p; // pangalan mismo ng province ("Rizal" = Rizal province)
+      if (pos > bestPos || (pos === bestPos && pos >= 0 && isOwnName)) {
+        best = p;
+        bestPos = pos;
+      }
+    });
+  });
+  return best;
+};
+
 const matchesProvince = (dest, province) => {
   if (province === 'All') return true;
-  const text = normalize(`${dest.province || ''} ${dest.address || ''}`);
-  if (hasWord(text, province)) return true;
-  return (PROVINCE_TOWNS[province] || []).some((town) => hasWord(text, town));
+  return getProvinceOf(dest) === province;
 };
 
 // Category: kaya ang maraming category sa isang destination (hal. "Beach, Mountain")
