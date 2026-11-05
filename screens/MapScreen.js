@@ -23,9 +23,6 @@ import styles from '../styles/mapStyles';
 
 const CALABARZON_CENTER = { latitude: 14.1008, longitude: 121.0794, zoom: 9 };
 
-// TomTom live traffic overlay. Ilagay ang key sa .env: EXPO_PUBLIC_TOMTOM_KEY=iyong_key
-const TOMTOM_KEY = process.env.EXPO_PUBLIC_TOMTOM_KEY;
-
 // Naka-labas sa component para hindi nagbabago ang reference sa bawat render
 const ORIGIN_WHITELIST = ['*'];
 
@@ -267,17 +264,6 @@ const buildMapHtml = () => `
       return iconCache[color];
     }
 
-    // Traffic flow overlay (kulay ng traffic sa kalsada)
-    var trafficLayer = null;
-    window.setTraffic = function (on, key) {
-      if (trafficLayer) { map.removeLayer(trafficLayer); trafficLayer = null; }
-      if (!on) return;
-      trafficLayer = L.tileLayer(
-        'https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=' + key,
-        { maxZoom: 17, opacity: 0.8, updateWhenIdle: true }
-      ).addTo(map);
-    };
-
     function send(data) {
       window.ReactNativeWebView.postMessage(JSON.stringify(data));
     }
@@ -509,7 +495,6 @@ const MapScreen = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showMenu, setShowMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [showTraffic, setShowTraffic] = useState(false);
   const activeFilterCount =
     (selectedProvince !== 'All' ? 1 : 0) + (selectedCategory !== 'All' ? 1 : 0);
 
@@ -708,16 +693,6 @@ const MapScreen = ({ navigation }) => {
     runInMap('window.centerMap()');
   };
 
-  const toggleTraffic = () => {
-    if (!TOMTOM_KEY) {
-      notify('Traffic Unavailable', 'Walang TomTom API key. Ilagay sa .env at i-restart ang Expo.');
-      return;
-    }
-    const next = !showTraffic;
-    setShowTraffic(next);
-    runInMap(`window.setTraffic(${next}, '${TOMTOM_KEY}')`);
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -789,11 +764,6 @@ const MapScreen = ({ navigation }) => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.controlButton} onPress={loadDestinations}>
               <Text style={styles.controlButtonText}>🔄 Reload</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.controlButton} onPress={toggleTraffic}>
-              <Text style={styles.controlButtonText}>
-                🚦 Traffic {showTraffic ? 'ON' : 'OFF'}
-              </Text>
             </TouchableOpacity>
           </View>
 
