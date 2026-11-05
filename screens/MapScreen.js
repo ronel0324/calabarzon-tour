@@ -74,34 +74,38 @@ const normalize = (s) =>
 // Mga bayan/lugar bawat province. Dagdagan lang kapag may bagong destination.
 const PROVINCE_TOWNS = {
   Quezon: [
-    'Agdangan', 'Alabat', 'Atimonan', 'Burdeos', 'Cagbalete', 'Calauag',
-    'Candelaria', 'Catanauan', 'General Nakar', 'Guinayangan', 'Gumaca',
-    'Infanta', 'Jomalig', 'Lucban', 'Lucena', 'Macalelon', 'Mauban',
-    'Mulanay', 'Padre Burgos', 'Pagbilao', 'Panukulan', 'Patnanungan',
-    'Pitogo', 'Polillo', 'Sariaya', 'Tagkawayan', 'Tayabas', 'Tiaong', 'Unisan'
+    'Agdangan', 'Alabat', 'Atimonan', 'Buenavista', 'Burdeos', 'Calauag', 
+    'Candelaria', 'Catanauan', 'Dolores', 'General Luna', 'General Nakar', 
+    'Guinayangan', 'Gumaca', 'Infanta', 'Jomalig', 'Lopez', 'Lucban', 
+    'Lucena', 'Macalelon', 'Mauban', 'Mulanay', 'Padre Burgos', 'Pagbilao', 
+    'Panukulan', 'Patnanungan', 'Perez', 'Pitogo', 'Plaridel', 'Polillo', 
+    'Quezon', 'Real', 'Sampaloc', 'San Andres', 'San Antonio', 'San Francisco', 
+    'San Narciso', 'Sariaya', 'Tagkawayan', 'Tayabas', 'Tiaong', 'Unisan'
   ],
   Laguna: [
-    'Alaminos', 'Binan', 'Cabuyao', 'Calamba', 'Calauan', 'Cavinti', 'Famy',
-    'Kalayaan', 'Liliw', 'Los Banos', 'Luisiana', 'Lumban', 'Mabitac',
-    'Magdalena', 'Majayjay', 'Nagcarlan', 'Paete', 'Pagsanjan', 'Pakil',
-    'Pangil', 'Pila', 'Siniloan', 'Victoria'
+    'Alaminos', 'Bay', 'Biñan', 'Cabuyao', 'Calamba', 'Calauan', 'Cavinti', 
+    'Famy', 'Kalayaan', 'Liliw', 'Los Baños', 'Luisiana', 'Lumban', 'Mabitac', 
+    'Magdalena', 'Majayjay', 'Nagcarlan', 'Paete', 'Pagsanjan', 'Pakil', 
+    'Pangil', 'Pila', 'Rizal', 'San Pablo', 'San Pedro', 'Santa Cruz', 
+    'Santa Maria', 'Santa Rosa', 'Siniloan', 'Victoria'
   ],
   Batangas: [
     'Agoncillo', 'Alitagtag', 'Balayan', 'Balete', 'Batangas City', 'Bauan',
     'Calaca', 'Calatagan', 'Cuenca', 'Ibaan', 'Laurel', 'Lemery', 'Lian',
     'Lipa', 'Lobo', 'Mabini', 'Malvar', 'Mataasnakahoy', 'Nasugbu',
-    'Padre Garcia', 'Santa Teresita', 'Santo Tomas', 'Taal', 'Talisay',
-    'Tanauan', 'Taysan', 'Tingloy', 'Tuy'
+    'Padre Garcia', 'Rosario', 'San Jose', 'San Juan', 'San Luis', 'San Pascual',
+    'Santa Teresita', 'Santo Tomas', 'Taal', 'Talisay', 'Tanauan', 'Taysan',
+    'Tingloy', 'Tuy'
   ],
   Cavite: [
-    'Alfonso', 'Amadeo', 'Bacoor', 'Carmona', 'Cavite City', 'Dasmarinas',
+    'Alfonso', 'Amadeo', 'Bacoor', 'Carmona', 'Cavite City', 'Dasmariñas',
     'General Emilio Aguinaldo', 'General Mariano Alvarez', 'General Trias',
     'Imus', 'Indang', 'Kawit', 'Magallanes', 'Maragondon', 'Mendez', 'Naic',
-    'Noveleta', 'Silang', 'Tagaytay', 'Tanza', 'Ternate', 'Trece Martires'
+    'Noveleta', 'Rosario', 'Silang', 'Tagaytay', 'Tanza', 'Ternate', 'Trece Martires'
   ],
   Rizal: [
-    'Angono', 'Antipolo', 'Baras', 'Binangonan', 'Cainta', 'Cardona',
-    'Jalajala', 'Jala-Jala', 'Montalban', 'Morong', 'Pililla', 'Rodriguez',
+    'Angono', 'Antipolo', 'Baras', 'Binangonan', 'Cainta', 'Cardona', 
+    'Jala-jala', 'Morong', 'Pililla', 'Rodriguez', 'San Ildefonso', 
     'San Mateo', 'Tanay', 'Taytay', 'Teresa'
   ]
 };
