@@ -12,7 +12,14 @@ import {
   SafeAreaView
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { getDestinationById, updateDestination } from '../services/database';
+import { pickPanoramaImage } from '../utils/pickPanorama';
+import {
+  getDestinationById,
+  updateDestination,
+  addPanoramaPoint,
+  getEntryPanoramaPoint,
+  updatePanoramaPointImage
+} from '../services/database';
 import LocationPicker from '../components/LocationPicker';
 import styles from '../styles/formStyles';
 
@@ -50,12 +57,12 @@ export default function EditDestinationScreen({ route, navigation }) {
     address: '',
     categories: ['Natural Wonder'],
     image: '',
-    image_360: '', // <-- palitan kung iba ang pangalan ng column mo sa Supabase
     historical_info: '',
     cultural_significance: '',
     latitude: null,
     longitude: null
   });
+  const [panoramaUri, setPanoramaUri] = useState(null);
 
   useEffect(() => {
     loadDestination();
@@ -76,7 +83,6 @@ export default function EditDestinationScreen({ route, navigation }) {
           address: destination.address || '',
           categories: cats.length > 0 ? cats : ['Natural Wonder'],
           image: destination.image || '',
-          image_360: destination.image_360 || '',
           historical_info: destination.historical_info || '',
           cultural_significance: destination.cultural_significance || '',
           latitude: destination.latitude != null ? Number(destination.latitude) : null,
@@ -137,30 +143,10 @@ export default function EditDestinationScreen({ route, navigation }) {
     }
   };
 
-  // 360 image: bawal ang allowsEditing/crop, masisira ang equirectangular (2:1) na larawan
-  const pick360Image = async () => {
-    if (!(await ensureLibraryPermission())) return;
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      const asset = result.assets[0];
-      // Ang 360 equirectangular ay karaniwang 2:1 ang ratio
-      if (asset.width && asset.height) {
-        const ratio = asset.width / asset.height;
-        if (ratio < 1.8 || ratio > 2.2) {
-          notify(
-            'Hindi mukhang 360 photo',
-            'Ang 360 (equirectangular) na larawan ay karaniwang 2:1 ang ratio (hal. 4096x2048). Ginamit pa rin ang napili mo, pero baka mukhang stretched sa viewer.'
-          );
-        }
-      }
-      handleInputChange('image_360', asset.uri);
-    }
+  // Kapareho ng Add screen: gamit ang pickPanoramaImage
+  const handlePickPanorama = async () => {
+    const uri = await pickPanoramaImage();
+    if (uri) setPanoramaUri(uri);
   };
 
   const handleSubmit = async () => {
@@ -185,11 +171,38 @@ export default function EditDestinationScreen({ route, navigation }) {
 
     setSaving(true);
     try {
-      // Kung bagong larawan galing sa picker (image o image_360), ina-upload ito ng database.js sa Supabase
+      // Kung bagong larawan galing sa picker, ina-upload ito ng database.js sa Supabase
       await updateDestination(destinationId, {
         ...formData,
         category: formData.categories.join(', ')
       });
+
+      // Kapareho ng Add screen: ang 360 ay sine-save bilang panorama point.
+      // Kung may entry point na, i-update ang larawan niya; kung wala pa, mag-add.
+      if (panoramaUri) {
+        try {
+          const existing = await getEntryPanoramaPoint(destinationId);
+          if (existing) {
+            await updatePanoramaPointImage(existing.id, panoramaUri);
+          } else {
+            await addPanoramaPoint({
+              destination_id: destinationId,
+              name: 'Main View',
+              panorama_image: panoramaUri,
+              rotation: 0,
+              is_entry_point: true
+            });
+          }
+        } catch (panoError) {
+          console.error('Error saving 360 image:', panoError);
+          setSaving(false);
+          notify(
+            '360° image not saved',
+            `Na-save ang destination pero hindi ang 360° image.\n${panoError?.message || ''}`
+          );
+          return;
+        }
+      }
       setSaving(false);
       notify('Success', 'Destination updated successfully!', () => navigation.goBack());
     } catch (error) {
@@ -309,36 +322,19 @@ export default function EditDestinationScreen({ route, navigation }) {
 
           {/* ===== 360° Image ===== */}
           <Text style={styles.label}>360° Image (optional)</Text>
-          {formData.image_360 ? (
-            <View style={styles.imagePreviewContainer}>
-              <Image
-                source={{ uri: formData.image_360 }}
-                style={[styles.imagePreview, { aspectRatio: 2, height: undefined }]}
-                resizeMode="cover"
-              />
-              <TouchableOpacity style={styles.changeImageButton} onPress={pick360Image}>
-                <Text style={styles.changeImageButtonText}>Change 360° Image</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.changeImageButton, { marginTop: 8, backgroundColor: '#d9534f' }]}
-                onPress={() => handleInputChange('image_360', '')}
-              >
-                <Text style={styles.changeImageButtonText}>Remove 360° Image</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.imagePickerButton} onPress={pick360Image}>
-              <Text style={styles.imagePickerButtonText}>🌐 Select 360° Image</Text>
+          <Text style={styles.helperText}>
+            The ratio must be 2:1 (e.g., 4096×2048), coming from a 360 camera or Photo Sphere. The upload limit is up to 50 MB.
+          </Text>
+          <TouchableOpacity style={styles.panoramaButton} onPress={handlePickPanorama}>
+            <Text style={styles.panoramaButtonText}>
+              {panoramaUri ? '✅ 360° image selected (tap to change)' : '🌐 Select 360° Image'}
+            </Text>
+          </TouchableOpacity>
+          {panoramaUri && (
+            <TouchableOpacity onPress={() => setPanoramaUri(null)}>
+              <Text style={styles.removePanoramaText}>Remove 360° image</Text>
             </TouchableOpacity>
           )}
-
-          <Text style={styles.helperText}>Or enter 360° image URL:</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="https://example.com/panorama.jpg"
-            value={formData.image_360}
-            onChangeText={(text) => handleInputChange('image_360', text)}
-          />
 
           <TouchableOpacity
             style={[styles.submitButton, saving && { opacity: 0.6 }]}

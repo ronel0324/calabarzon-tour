@@ -679,4 +679,19 @@ export const deleteInfoHotspot = async (id) => {
   if (error) throw error;
 };
 
+export const updatePanoramaPointImage = async (id, image) => {
+  try {
+    const panorama_image = await ensureRemoteImage(image);
+    const { error } = await supabase
+      .from('panorama_points')
+      .update({ panorama_image })
+      .eq('id', id);
+    if (error) throw error;
+    return true;
+  } catch (error) {
+    console.error('Error updating panorama point:', error);
+    throw error;
+  }
+};
+
 export default getDb;
