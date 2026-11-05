@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Platform,
   SafeAreaView
 } from 'react-native';
@@ -157,157 +156,152 @@ export default function AddDestinationScreen({ navigation }) {
     }
   };
 
+  // Parehong istruktura ng EditDestinationScreen (gumagana na): walang KeyboardAvoidingView
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
+      <ScrollView
         style={styles.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.content}>
-            <Text style={styles.label}>Destination Name *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter destination name"
-              value={formData.name}
-              onChangeText={(text) => handleInputChange('name', text)}
-            />
+        <View style={styles.content}>
+          <Text style={styles.label}>Destination Name *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter destination name"
+            value={formData.name}
+            onChangeText={(text) => handleInputChange('name', text)}
+          />
 
-            <Text style={styles.label}>Category * (multiple)</Text>
-            <View style={styles.categoryContainer}>
-              {CATEGORIES.map((category) => {
-                const selected = formData.categories.includes(category);
-                return (
-                  <TouchableOpacity
-                    key={category}
+          <Text style={styles.label}>Category * (multiple)</Text>
+          <View style={styles.categoryContainer}>
+            {CATEGORIES.map((category) => {
+              const selected = formData.categories.includes(category);
+              return (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryButton,
+                    selected && styles.categoryButtonActive
+                  ]}
+                  onPress={() => toggleCategory(category)}
+                >
+                  <Text
                     style={[
-                      styles.categoryButton,
-                      selected && styles.categoryButtonActive
+                      styles.categoryButtonText,
+                      selected && styles.categoryButtonTextActive
                     ]}
-                    onPress={() => toggleCategory(category)}
                   >
-                    <Text
-                      style={[
-                        styles.categoryButtonText,
-                        selected && styles.categoryButtonTextActive
-                      ]}
-                    >
-                      {selected ? '✓ ' : ''}{category}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <Text style={styles.label}>Address *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter address"
-              value={formData.address}
-              onChangeText={(text) => handleInputChange('address', text)}
-            />
-
-            {/* Mapa sa phone, lat/long input sa web */}
-            <LocationPicker
-              latitude={formData.latitude}
-              longitude={formData.longitude}
-              onChange={handleLocationChange}
-            />
-
-            <Text style={styles.label}>Description *</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Enter description"
-              value={formData.description}
-              onChangeText={(text) => handleInputChange('description', text)}
-              multiline
-              numberOfLines={4}
-            />
-
-            <Text style={styles.label}>Historical Information</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Enter historical information (optional)"
-              value={formData.historical_info}
-              onChangeText={(text) => handleInputChange('historical_info', text)}
-              multiline
-              numberOfLines={4}
-            />
-
-            <Text style={styles.label}>Cultural Significance</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Enter cultural significance (optional)"
-              value={formData.cultural_significance}
-              onChangeText={(text) => handleInputChange('cultural_significance', text)}
-              multiline
-              numberOfLines={4}
-            />
-
-            <Text style={styles.label}>Image</Text>
-            {formData.image ? (
-              <View style={styles.imagePreviewContainer}>
-                <Image source={{ uri: formData.image }} style={styles.imagePreview} />
-                <TouchableOpacity style={styles.changeImageButton} onPress={pickImage}>
-                  <Text style={styles.changeImageButtonText}>Change Image</Text>
+                    {selected ? '✓ ' : ''}{category}
+                  </Text>
                 </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
-                <Text style={styles.imagePickerButtonText}>📷 Select Image</Text>
-              </TouchableOpacity>
-            )}
-
-            <Text style={styles.helperText}>Or enter image URL:</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="https://example.com/image.jpg"
-              value={formData.image}
-              onChangeText={(text) => handleInputChange('image', text)}
-            />
-
-            {/* ---- 360° SECTION ---- */}
-            <Text style={styles.label}>360° Image (optional)</Text>
-            <Text style={styles.helperText}>
-              The ratio must be 2:1 (e.g., 4096×2048), coming from a 360 camera or Photo Sphere. The upload limit is up to 50 MB.
-            </Text>
-            <TouchableOpacity style={styles.panoramaButton} onPress={handlePickPanorama}>
-              <Text style={styles.panoramaButtonText}>
-                {panoramaUri ? '✅ 360° image selected (tap to change)' : '🌐 Select 360° Image'}
-              </Text>
-            </TouchableOpacity>
-            {panoramaUri && (
-              <TouchableOpacity onPress={() => setPanoramaUri(null)}>
-                <Text style={styles.removePanoramaText}>Remove 360° image</Text>
-              </TouchableOpacity>
-            )}
-            {/* ---- DULO NG 360° SECTION ---- */}
-
-            <TouchableOpacity
-              style={[styles.submitButton, saving && { opacity: 0.6 }]}
-              onPress={handleSubmit}
-              disabled={saving}
-            >
-              <Text style={styles.submitButtonText}>
-                {saving ? 'Saving... (uploading images)' : 'Add Destination'}
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => navigation.goBack()}
-              disabled={saving}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+              );
+            })}
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+
+          <Text style={styles.label}>Address *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter address"
+            value={formData.address}
+            onChangeText={(text) => handleInputChange('address', text)}
+          />
+
+          {/* Mapa sa phone, lat/long input sa web */}
+          <LocationPicker
+            latitude={formData.latitude}
+            longitude={formData.longitude}
+            onChange={handleLocationChange}
+          />
+
+          <Text style={styles.label}>Description *</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Enter description"
+            value={formData.description}
+            onChangeText={(text) => handleInputChange('description', text)}
+            multiline
+            numberOfLines={4}
+          />
+
+          <Text style={styles.label}>Historical Information</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Enter historical information (optional)"
+            value={formData.historical_info}
+            onChangeText={(text) => handleInputChange('historical_info', text)}
+            multiline
+            numberOfLines={4}
+          />
+
+          <Text style={styles.label}>Cultural Significance</Text>
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Enter cultural significance (optional)"
+            value={formData.cultural_significance}
+            onChangeText={(text) => handleInputChange('cultural_significance', text)}
+            multiline
+            numberOfLines={4}
+          />
+
+          <Text style={styles.label}>Image</Text>
+          {formData.image ? (
+            <View style={styles.imagePreviewContainer}>
+              <Image source={{ uri: formData.image }} style={styles.imagePreview} />
+              <TouchableOpacity style={styles.changeImageButton} onPress={pickImage}>
+                <Text style={styles.changeImageButtonText}>Change Image</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+              <Text style={styles.imagePickerButtonText}>📷 Select Image</Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.helperText}>Or enter image URL:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="https://example.com/image.jpg"
+            value={formData.image}
+            onChangeText={(text) => handleInputChange('image', text)}
+          />
+
+          {/* ---- 360° SECTION ---- */}
+          <Text style={styles.label}>360° Image (optional)</Text>
+          <Text style={styles.helperText}>
+            The ratio must be 2:1 (e.g., 4096×2048), coming from a 360 camera or Photo Sphere. The upload limit is up to 50 MB.
+          </Text>
+          <TouchableOpacity style={styles.panoramaButton} onPress={handlePickPanorama}>
+            <Text style={styles.panoramaButtonText}>
+              {panoramaUri ? '✅ 360° image selected (tap to change)' : '🌐 Select 360° Image'}
+            </Text>
+          </TouchableOpacity>
+          {panoramaUri && (
+            <TouchableOpacity onPress={() => setPanoramaUri(null)}>
+              <Text style={styles.removePanoramaText}>Remove 360° image</Text>
+            </TouchableOpacity>
+          )}
+          {/* ---- DULO NG 360° SECTION ---- */}
+
+          <TouchableOpacity
+            style={[styles.submitButton, saving && { opacity: 0.6 }]}
+            onPress={handleSubmit}
+            disabled={saving}
+          >
+            <Text style={styles.submitButtonText}>
+              {saving ? 'Saving... (uploading images)' : 'Add Destination'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cancelButton}
+            onPress={() => navigation.goBack()}
+            disabled={saving}
+          >
+            <Text style={styles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
