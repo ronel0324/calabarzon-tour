@@ -23,9 +23,8 @@ import styles from '../styles/mapStyles';
 
 const CALABARZON_CENTER = { latitude: 14.1008, longitude: 121.0794, zoom: 9 };
 
-// Masyadong mabilis ang oras na binibigay ng OSRM (ideal na bilis, walang traffic).
-// Ginagawang multiplier para mas realistic. Taasan kung mabilis pa rin, ibaba kung bagal na.
-const TRAFFIC_FACTOR = 1.7;
+// TomTom live traffic overlay. Ilagay ang key sa .env: EXPO_PUBLIC_TOMTOM_KEY=iyong_key
+const TOMTOM_KEY = process.env.EXPO_PUBLIC_TOMTOM_KEY;
 
 // Naka-labas sa component para hindi nagbabago ang reference sa bawat render
 const ORIGIN_WHITELIST = ['*'];
@@ -74,19 +73,19 @@ const normalize = (s) =>
 // Mga bayan/lugar bawat province. Dagdagan lang kapag may bagong destination.
 const PROVINCE_TOWNS = {
   Quezon: [
-    'Agdangan', 'Alabat', 'Atimonan', 'Buenavista', 'Burdeos', 'Calauag', 
-    'Candelaria', 'Catanauan', 'Dolores', 'General Luna', 'General Nakar', 
-    'Guinayangan', 'Gumaca', 'Infanta', 'Jomalig', 'Lopez', 'Lucban', 
-    'Lucena', 'Macalelon', 'Mauban', 'Mulanay', 'Padre Burgos', 'Pagbilao', 
-    'Panukulan', 'Patnanungan', 'Perez', 'Pitogo', 'Plaridel', 'Polillo', 
-    'Quezon', 'Real', 'Sampaloc', 'San Andres', 'San Antonio', 'San Francisco', 
+    'Agdangan', 'Alabat', 'Atimonan', 'Buenavista', 'Burdeos', 'Calauag',
+    'Candelaria', 'Catanauan', 'Dolores', 'General Luna', 'General Nakar',
+    'Guinayangan', 'Gumaca', 'Infanta', 'Jomalig', 'Lopez', 'Lucban',
+    'Lucena', 'Macalelon', 'Mauban', 'Mulanay', 'Padre Burgos', 'Pagbilao',
+    'Panukulan', 'Patnanungan', 'Perez', 'Pitogo', 'Plaridel', 'Polillo',
+    'Quezon', 'Real', 'Sampaloc', 'San Andres', 'San Antonio', 'San Francisco',
     'San Narciso', 'Sariaya', 'Tagkawayan', 'Tayabas', 'Tiaong', 'Unisan'
   ],
   Laguna: [
-    'Alaminos', 'Bay', 'Biñan', 'Cabuyao', 'Calamba', 'Calauan', 'Cavinti', 
-    'Famy', 'Kalayaan', 'Liliw', 'Los Baños', 'Luisiana', 'Lumban', 'Mabitac', 
-    'Magdalena', 'Majayjay', 'Nagcarlan', 'Paete', 'Pagsanjan', 'Pakil', 
-    'Pangil', 'Pila', 'Rizal', 'San Pablo', 'San Pedro', 'Santa Cruz', 
+    'Alaminos', 'Bay', 'Biñan', 'Cabuyao', 'Calamba', 'Calauan', 'Cavinti',
+    'Famy', 'Kalayaan', 'Liliw', 'Los Baños', 'Luisiana', 'Lumban', 'Mabitac',
+    'Magdalena', 'Majayjay', 'Nagcarlan', 'Paete', 'Pagsanjan', 'Pakil',
+    'Pangil', 'Pila', 'Rizal', 'San Pablo', 'San Pedro', 'Santa Cruz',
     'Santa Maria', 'Santa Rosa', 'Siniloan', 'Victoria'
   ],
   Batangas: [
@@ -104,8 +103,8 @@ const PROVINCE_TOWNS = {
     'Noveleta', 'Rosario', 'Silang', 'Tagaytay', 'Tanza', 'Ternate', 'Trece Martires'
   ],
   Rizal: [
-    'Angono', 'Antipolo', 'Baras', 'Binangonan', 'Cainta', 'Cardona', 
-    'Jala-jala', 'Morong', 'Pililla', 'Rodriguez', 'San Ildefonso', 
+    'Angono', 'Antipolo', 'Baras', 'Binangonan', 'Cainta', 'Cardona',
+    'Jala-jala', 'Morong', 'Pililla', 'Rodriguez', 'San Ildefonso',
     'San Mateo', 'Tanay', 'Taytay', 'Teresa'
   ]
 };
@@ -168,20 +167,6 @@ const matchesCategory = (dest, category) => {
     .split(',')
     .map((c) => c.trim())
     .includes(category);
-};
-
-// Format ng layo at oras para sa route card
-const formatDistance = (meters) => {
-  if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
-  return `${Math.round(meters)} m`;
-};
-
-const formatDuration = (seconds) => {
-  const totalMin = Math.max(1, Math.round(seconds / 60));
-  if (totalMin < 60) return `${totalMin} min`;
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return m ? `${h} hr ${m} min` : `${h} hr`;
 };
 
 // Leaflet + OpenStreetMap (walang API key na kailangan)
@@ -281,7 +266,17 @@ const buildMapHtml = () => `
       });
       return iconCache[color];
     }
-    var routeLayer = null;
+
+    // Traffic flow overlay (kulay ng traffic sa kalsada)
+    var trafficLayer = null;
+    window.setTraffic = function (on, key) {
+      if (trafficLayer) { map.removeLayer(trafficLayer); trafficLayer = null; }
+      if (!on) return;
+      trafficLayer = L.tileLayer(
+        'https://api.tomtom.com/traffic/map/4/tile/flow/relative/{z}/{x}/{y}.png?key=' + key,
+        { maxZoom: 17, opacity: 0.8, updateWhenIdle: true }
+      ).addTo(map);
+    };
 
     function send(data) {
       window.ReactNativeWebView.postMessage(JSON.stringify(data));
@@ -335,25 +330,6 @@ const buildMapHtml = () => `
       if (meMarker) { meMarker.setLatLng([lat, lng]); }
       else { meMarker = L.marker([lat, lng], { icon: icon, interactive: false }).addTo(map); }
       if (fly) { map.setView([lat, lng], 10, { animate: true, duration: 0.6 }); }
-    };
-
-    // Iguhit ang ruta. coords ay galing sa OSRM: [[lng, lat], ...]
-    window.drawRoute = function (coords) {
-      if (routeLayer) { map.removeLayer(routeLayer); }
-      var latlngs = coords.map(function (c) { return [c[1], c[0]]; });
-      routeLayer = L.layerGroup();
-      // puting outline sa ilalim para kita sa kahit anong kulay ng mapa
-      L.polyline(latlngs, { color: '#fff', weight: 9, opacity: 0.9, smoothFactor: 2 }).addTo(routeLayer);
-      L.polyline(latlngs, { color: '#1976D2', weight: 5, opacity: 1, smoothFactor: 2 }).addTo(routeLayer);
-      routeLayer.addTo(map);
-      map.fitBounds(L.latLngBounds(latlngs), {
-        paddingTopLeft: [40, 40],
-        paddingBottomRight: [40, 160]
-      });
-    };
-
-    window.clearRoute = function () {
-      if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
     };
 
     // Lipad sa napiling destination
@@ -529,12 +505,11 @@ const MapScreen = ({ navigation }) => {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [selectedHasPanorama, setSelectedHasPanorama] = useState(false);
-  const [route, setRoute] = useState(null); // { name, distance, duration }
-  const [routeLoading, setRouteLoading] = useState(false);
   const [selectedProvince, setSelectedProvince] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showMenu, setShowMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showTraffic, setShowTraffic] = useState(false);
   const activeFilterCount =
     (selectedProvince !== 'All' ? 1 : 0) + (selectedCategory !== 'All' ? 1 : 0);
 
@@ -729,68 +704,18 @@ const MapScreen = ({ navigation }) => {
     });
   };
 
-  // Ruta mula sa lokasyon ng user papunta sa napiling destination (OSRM, walang API key)
-  const handleGetDirections = async () => {
-    if (!selectedDestination) return;
-    const dest = selectedDestination;
-    setShowInfoModal(false);
-    setRouteLoading(true);
-
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        notify(
-          'Permission Denied',
-          'Location permission is required to get directions from your position.'
-        );
-        return;
-      }
-
-      const loc = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced
-      });
-      const from = loc.coords;
-      const toLat = Number(dest.latitude);
-      const toLng = Number(dest.longitude);
-
-      const url =
-        `https://router.project-osrm.org/route/v1/driving/` +
-        `${from.longitude},${from.latitude};${toLng},${toLat}` +
-        `?overview=full&geometries=geojson`;
-
-      const res = await fetch(url);
-      const json = await res.json();
-
-      if (json.code !== 'Ok' || !json.routes || json.routes.length === 0) {
-        notify('No Route Found', 'Walang nahanap na ruta papunta sa destination na ito.');
-        return;
-      }
-
-      const best = json.routes[0];
-
-      runInMap(`window.setUserLocation(${from.latitude}, ${from.longitude}, false)`);
-      runInMap(`window.drawRoute(${JSON.stringify(best.geometry.coordinates)})`);
-
-      setRoute({
-        name: dest.name,
-        distance: best.distance, // meters
-        duration: best.duration * TRAFFIC_FACTOR // seconds (adjusted)
-      });
-    } catch (error) {
-      console.error('Error getting directions:', error);
-      notify('Error', 'Hindi makuha ang ruta. Check ang internet connection mo at subukan ulit.');
-    } finally {
-      setRouteLoading(false);
-    }
-  };
-
-  const handleClearRoute = () => {
-    runInMap('window.clearRoute()');
-    setRoute(null);
-  };
-
   const centerOnCALABARZON = () => {
     runInMap('window.centerMap()');
+  };
+
+  const toggleTraffic = () => {
+    if (!TOMTOM_KEY) {
+      notify('Traffic Unavailable', 'Walang TomTom API key. Ilagay sa .env at i-restart ang Expo.');
+      return;
+    }
+    const next = !showTraffic;
+    setShowTraffic(next);
+    runInMap(`window.setTraffic(${next}, '${TOMTOM_KEY}')`);
   };
 
   return (
@@ -865,6 +790,11 @@ const MapScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.controlButton} onPress={loadDestinations}>
               <Text style={styles.controlButtonText}>🔄 Reload</Text>
             </TouchableOpacity>
+            <TouchableOpacity style={styles.controlButton} onPress={toggleTraffic}>
+              <Text style={styles.controlButtonText}>
+                🚦 Traffic {showTraffic ? 'ON' : 'OFF'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Destination Counter */}
@@ -905,33 +835,6 @@ const MapScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 ))
               )}
-            </View>
-          )}
-
-          {/* Loading habang kinukuha ang ruta */}
-          {routeLoading && (
-            <View style={styles.routeLoading}>
-              <ActivityIndicator size="small" color="#1976D2" />
-              <Text style={styles.routeLoadingText}>Finding route...</Text>
-            </View>
-          )}
-
-          {/* Route Card: ETA at layo */}
-          {route && (
-            <View style={styles.routeCard}>
-              <View style={styles.routeCardInfo}>
-                <Text style={styles.routeCardName} numberOfLines={1}>
-                  🧭 {route.name}
-                </Text>
-                <View style={styles.routeStatsRow}>
-                  <Text style={styles.routeDuration}>~{formatDuration(route.duration)}</Text>
-                  <Text style={styles.routeDistance}>{formatDistance(route.distance)}</Text>
-                </View>
-                <Text style={styles.routeNote}>Estimated time only, traffic not included</Text>
-              </View>
-              <TouchableOpacity style={styles.routeClearButton} onPress={handleClearRoute}>
-                <Text style={styles.routeClearText}>✕ Clear</Text>
-              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -1097,12 +1000,6 @@ const MapScreen = ({ navigation }) => {
                         <Text style={styles.modalButtonText}>🌐 View 360°</Text>
                       </TouchableOpacity>
                     )}
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.directionsButton]}
-                      onPress={handleGetDirections}
-                    >
-                      <Text style={styles.modalButtonText}>🧭 Get Directions</Text>
-                    </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.modalButton, styles.detailsButton]}
                       onPress={handleViewDetails}
