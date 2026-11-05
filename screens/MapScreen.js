@@ -67,11 +67,56 @@ const getPinColor = (category) => {
 const PROVINCES = ['All', 'Cavite', 'Laguna', 'Batangas', 'Rizal', 'Quezon'];
 const CATEGORY_OPTIONS = ['All', ...Object.keys(categoryColors)];
 
-// Province: tinitingnan ang `province` field (kung meron) at ang address ng destination
+// Tanggalin ang accent (Biñan, Los Baños, Dasmariñas) para tugma kahit walang ñ
+const normalize = (s) =>
+  (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+// Mga bayan/lugar bawat province. Dagdagan lang kapag may bagong destination.
+const PROVINCE_TOWNS = {
+  Quezon: [
+    'Agdangan', 'Alabat', 'Atimonan', 'Burdeos', 'Cagbalete', 'Calauag',
+    'Candelaria', 'Catanauan', 'General Nakar', 'Guinayangan', 'Gumaca',
+    'Infanta', 'Jomalig', 'Lucban', 'Lucena', 'Macalelon', 'Mauban',
+    'Mulanay', 'Padre Burgos', 'Pagbilao', 'Panukulan', 'Patnanungan',
+    'Pitogo', 'Polillo', 'Sariaya', 'Tagkawayan', 'Tayabas', 'Tiaong', 'Unisan'
+  ],
+  Laguna: [
+    'Alaminos', 'Binan', 'Cabuyao', 'Calamba', 'Calauan', 'Cavinti', 'Famy',
+    'Kalayaan', 'Liliw', 'Los Banos', 'Luisiana', 'Lumban', 'Mabitac',
+    'Magdalena', 'Majayjay', 'Nagcarlan', 'Paete', 'Pagsanjan', 'Pakil',
+    'Pangil', 'Pila', 'Siniloan', 'Victoria'
+  ],
+  Batangas: [
+    'Agoncillo', 'Alitagtag', 'Balayan', 'Balete', 'Batangas City', 'Bauan',
+    'Calaca', 'Calatagan', 'Cuenca', 'Ibaan', 'Laurel', 'Lemery', 'Lian',
+    'Lipa', 'Lobo', 'Mabini', 'Malvar', 'Mataasnakahoy', 'Nasugbu',
+    'Padre Garcia', 'Santa Teresita', 'Santo Tomas', 'Taal', 'Talisay',
+    'Tanauan', 'Taysan', 'Tingloy', 'Tuy'
+  ],
+  Cavite: [
+    'Alfonso', 'Amadeo', 'Bacoor', 'Carmona', 'Cavite City', 'Dasmarinas',
+    'General Emilio Aguinaldo', 'General Mariano Alvarez', 'General Trias',
+    'Imus', 'Indang', 'Kawit', 'Magallanes', 'Maragondon', 'Mendez', 'Naic',
+    'Noveleta', 'Silang', 'Tagaytay', 'Tanza', 'Ternate', 'Trece Martires'
+  ],
+  Rizal: [
+    'Angono', 'Antipolo', 'Baras', 'Binangonan', 'Cainta', 'Cardona',
+    'Jalajala', 'Jala-Jala', 'Montalban', 'Morong', 'Pililla', 'Rodriguez',
+    'San Mateo', 'Tanay', 'Taytay', 'Teresa'
+  ]
+};
+
+// Tugma lang kung buong salita (hindi nasa gitna ng ibang salita)
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const hasWord = (text, word) =>
+  new RegExp(`(^|[^a-z])${escapeRegex(normalize(word))}([^a-z]|$)`).test(text);
+
+// Province: tinitingnan ang `province` field (kung meron), ang address, at ang mga bayan
 const matchesProvince = (dest, province) => {
   if (province === 'All') return true;
-  const text = `${dest.province || ''} ${dest.address || ''}`.toLowerCase();
-  return text.includes(province.toLowerCase());
+  const text = normalize(`${dest.province || ''} ${dest.address || ''}`);
+  if (hasWord(text, province)) return true;
+  return (PROVINCE_TOWNS[province] || []).some((town) => hasWord(text, town));
 };
 
 // Category: kaya ang maraming category sa isang destination (hal. "Beach, Mountain")
