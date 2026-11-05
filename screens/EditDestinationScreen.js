@@ -50,6 +50,7 @@ export default function EditDestinationScreen({ route, navigation }) {
     address: '',
     categories: ['Natural Wonder'],
     image: '',
+    image_360: '', // <-- palitan kung iba ang pangalan ng column mo sa Supabase
     historical_info: '',
     cultural_significance: '',
     latitude: null,
@@ -75,6 +76,7 @@ export default function EditDestinationScreen({ route, navigation }) {
           address: destination.address || '',
           categories: cats.length > 0 ? cats : ['Natural Wonder'],
           image: destination.image || '',
+          image_360: destination.image_360 || '',
           historical_info: destination.historical_info || '',
           cultural_significance: destination.cultural_significance || '',
           latitude: destination.latitude != null ? Number(destination.latitude) : null,
@@ -109,14 +111,19 @@ export default function EditDestinationScreen({ route, navigation }) {
     setFormData(prev => ({ ...prev, latitude, longitude }));
   };
 
-  const pickImage = async () => {
+  const ensureLibraryPermission = async () => {
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         notify('Permission Denied', 'We need camera roll permissions to select images.');
-        return;
+        return false;
       }
     }
+    return true;
+  };
+
+  const pickImage = async () => {
+    if (!(await ensureLibraryPermission())) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -127,6 +134,32 @@ export default function EditDestinationScreen({ route, navigation }) {
 
     if (!result.canceled) {
       handleInputChange('image', result.assets[0].uri);
+    }
+  };
+
+  // 360 image: bawal ang allowsEditing/crop, masisira ang equirectangular (2:1) na larawan
+  const pick360Image = async () => {
+    if (!(await ensureLibraryPermission())) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 1,
+    });
+
+    if (!result.canceled) {
+      const asset = result.assets[0];
+      // Ang 360 equirectangular ay karaniwang 2:1 ang ratio
+      if (asset.width && asset.height) {
+        const ratio = asset.width / asset.height;
+        if (ratio < 1.8 || ratio > 2.2) {
+          notify(
+            'Hindi mukhang 360 photo',
+            'Ang 360 (equirectangular) na larawan ay karaniwang 2:1 ang ratio (hal. 4096x2048). Ginamit pa rin ang napili mo, pero baka mukhang stretched sa viewer.'
+          );
+        }
+      }
+      handleInputChange('image_360', asset.uri);
     }
   };
 
@@ -152,7 +185,7 @@ export default function EditDestinationScreen({ route, navigation }) {
 
     setSaving(true);
     try {
-      // Kung bagong larawan galing sa picker, ina-upload ito ng database.js sa Supabase
+      // Kung bagong larawan galing sa picker (image o image_360), ina-upload ito ng database.js sa Supabase
       await updateDestination(destinationId, {
         ...formData,
         category: formData.categories.join(', ')
@@ -272,6 +305,39 @@ export default function EditDestinationScreen({ route, navigation }) {
             placeholder="https://example.com/image.jpg"
             value={formData.image}
             onChangeText={(text) => handleInputChange('image', text)}
+          />
+
+          {/* ===== 360° Image ===== */}
+          <Text style={styles.label}>360° Image (optional)</Text>
+          {formData.image_360 ? (
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: formData.image_360 }}
+                style={[styles.imagePreview, { aspectRatio: 2, height: undefined }]}
+                resizeMode="cover"
+              />
+              <TouchableOpacity style={styles.changeImageButton} onPress={pick360Image}>
+                <Text style={styles.changeImageButtonText}>Change 360° Image</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.changeImageButton, { marginTop: 8, backgroundColor: '#d9534f' }]}
+                onPress={() => handleInputChange('image_360', '')}
+              >
+                <Text style={styles.changeImageButtonText}>Remove 360° Image</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.imagePickerButton} onPress={pick360Image}>
+              <Text style={styles.imagePickerButtonText}>🌐 Select 360° Image</Text>
+            </TouchableOpacity>
+          )}
+
+          <Text style={styles.helperText}>Or enter 360° image URL:</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="https://example.com/panorama.jpg"
+            value={formData.image_360}
+            onChangeText={(text) => handleInputChange('image_360', text)}
           />
 
           <TouchableOpacity
