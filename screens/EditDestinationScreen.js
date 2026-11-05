@@ -179,19 +179,23 @@ export default function EditDestinationScreen({ route, navigation }) {
 
       // Kapareho ng Add screen: ang 360 ay sine-save bilang panorama point.
       // Kung may entry point na, i-update ang larawan niya; kung wala pa, mag-add.
+      let panoMsg = '';
+      console.log('360 selected?', panoramaUri);
       if (panoramaUri) {
         try {
           const existing = await getEntryPanoramaPoint(destinationId);
           if (existing) {
             await updatePanoramaPointImage(existing.id, panoramaUri);
+            panoMsg = `\n360° image: in-update ang existing point (id ${existing.id}).`;
           } else {
-            await addPanoramaPoint({
+            const newPointId = await addPanoramaPoint({
               destination_id: destinationId,
               name: 'Main View',
               panorama_image: panoramaUri,
               rotation: 0,
               is_entry_point: true
             });
+            panoMsg = `\n360° image: nag-add ng bagong point (id ${newPointId}).`;
           }
         } catch (panoError) {
           console.error('Error saving 360 image:', panoError);
@@ -204,7 +208,11 @@ export default function EditDestinationScreen({ route, navigation }) {
         }
       }
       setSaving(false);
-      notify('Success', 'Destination updated successfully!', () => navigation.goBack());
+      notify(
+        'Success',
+        `Destination updated successfully!${panoMsg || '\n(Walang napiling 360° image.)'}`,
+        () => navigation.goBack()
+      );
     } catch (error) {
       setSaving(false);
       console.error('Error updating destination:', error);
