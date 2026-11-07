@@ -4,12 +4,14 @@ import {
   Text,
   StyleSheet,
   FlatList,
+  ScrollView,
   TouchableOpacity,
   TextInput,
   Image,
   Alert,
   Platform,
-  SafeAreaView
+  SafeAreaView,
+  Modal // NEW: para sa category at province dropdown
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import {
@@ -34,10 +36,23 @@ const CATEGORIES = [
   'Other'
 ];
 
+// NEW: CALABARZON provinces para sa dropdown
+const PROVINCES = ['All Provinces', 'Batangas', 'Cavite', 'Laguna', 'Quezon', 'Rizal'];
+
+// NEW: Kukunin ang province mula sa item.province kung meron.
+// Kung wala, hahanapin sa address (hal. "Tanay, Rizal").
+const getProvince = (item) => {
+  if (item.province) return item.province;
+  const addr = (item.address || '').toLowerCase();
+  return PROVINCES.slice(1).find((p) => addr.includes(p.toLowerCase())) || null;
+};
+
 export default function DestinationListScreen({ navigation }) {
   const [destinations, setDestinations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedProvince, setSelectedProvince] = useState('All Provinces'); // NEW
+  const [openDropdown, setOpenDropdown] = useState(null); // NEW: null | 'category' | 'province'
   const { isAdmin } = useAuth();
 
   const loadDestinations = async () => {
@@ -50,6 +65,12 @@ export default function DestinationListScreen({ navigation }) {
       } else {
         results = await getAllDestinations();
       }
+
+      // NEW: province filter (gumagana kasabay ng search at category)
+      if (selectedProvince !== 'All Provinces') {
+        results = results.filter((item) => getProvince(item) === selectedProvince);
+      }
+
       setDestinations(results);
     } catch (error) {
       console.error('Error loading destinations:', error);
@@ -60,7 +81,7 @@ export default function DestinationListScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadDestinations();
-    }, [searchQuery, selectedCategory])
+    }, [searchQuery, selectedCategory, selectedProvince]) // NEW: selectedProvince
   );
 
   const handleSearch = (text) => {
@@ -70,6 +91,24 @@ export default function DestinationListScreen({ navigation }) {
   const handleCategoryFilter = (category) => {
     setSelectedCategory(category);
     setSearchQuery(''); // Clear search when filtering by category
+  };
+
+  // NEW: pagpili ng province mula sa dropdown
+  const handleProvinceSelect = (province) => {
+    setSelectedProvince(province);
+  };
+
+  // NEW: iisang modal para sa category at province
+  const dropdownOptions = openDropdown === 'category' ? CATEGORIES : PROVINCES;
+  const dropdownSelected = openDropdown === 'category' ? selectedCategory : selectedProvince;
+
+  const handleOptionSelect = (value) => {
+    if (openDropdown === 'category') {
+      handleCategoryFilter(value);
+    } else {
+      handleProvinceSelect(value);
+    }
+    setOpenDropdown(null);
   };
 
   // Hiwalay na function para sa actual na pagbura
@@ -144,36 +183,39 @@ export default function DestinationListScreen({ navigation }) {
       </TouchableOpacity>
 
       {isAdmin && (
-      <View style={styles.cardActions}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => navigation.navigate('EditDestination', { destinationId: item.id })}
-        >
-          <Text style={styles.editButtonText}>Edit</Text>
-        </TouchableOpacity>
-                <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => {
-            console.log('Add Quiz pressed:', item.id, item.name);
-            console.log('Registered routes:', navigation.getState().routeNames);
-            navigation.navigate('AddQuiz', {
-              destinationId: item.id,
-              destinationName: item.name
-            });
-          }}
-        >
-          <Text style={styles.editButtonText}>Add Quiz</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDelete(item.id, item.name)}
-        >
-          <Text style={styles.deleteButtonText}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    )}
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => navigation.navigate('EditDestination', { destinationId: item.id })}
+          >
+            <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => {
+              console.log('Add Quiz pressed:', item.id, item.name);
+              console.log('Registered routes:', navigation.getState().routeNames);
+              navigation.navigate('AddQuiz', {
+                destinationId: item.id,
+                destinationName: item.name
+              });
+            }}
+          >
+            <Text style={styles.editButtonText}>Add Quiz</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDelete(item.id, item.name)}
+          >
+            <Text style={styles.deleteButtonText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
+
+  const categoryActive = selectedCategory !== 'All';
+  const provinceActive = selectedProvince !== 'All Provinces';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -188,33 +230,71 @@ export default function DestinationListScreen({ navigation }) {
           />
         </View>
 
-        {/* Category Filter */}
-        <View style={styles.filterContainer}>
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={CATEGORIES}
-            keyExtractor={(item) => item}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[
-                  styles.filterButton,
-                  selectedCategory === item && styles.filterButtonActive
-                ]}
-                onPress={() => handleCategoryFilter(item)}
-              >
-                <Text
-                  style={[
-                    styles.filterButtonText,
-                    selectedCategory === item && styles.filterButtonTextActive
-                  ]}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
+        {/* NEW: Dalawang dropdown button — Categories at Province */}
+        <View style={dropdownStyles.row}>
+          <TouchableOpacity
+            style={[styles.filterButton, categoryActive && styles.filterButtonActive]}
+            onPress={() => setOpenDropdown('category')}
+          >
+            <Text
+              style={[styles.filterButtonText, categoryActive && styles.filterButtonTextActive]}
+            >
+              {categoryActive ? selectedCategory : 'Categories'} ▼
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filterButton, provinceActive && styles.filterButtonActive]}
+            onPress={() => setOpenDropdown('province')}
+          >
+            <Text
+              style={[styles.filterButtonText, provinceActive && styles.filterButtonTextActive]}
+            >
+              {provinceActive ? selectedProvince : 'Province'} ▼
+            </Text>
+          </TouchableOpacity>
         </View>
+
+        {/* NEW: Modal na ginagamit ng dalawang dropdown */}
+        <Modal
+          visible={openDropdown !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setOpenDropdown(null)}
+        >
+          <TouchableOpacity
+            style={dropdownStyles.overlay}
+            activeOpacity={1}
+            onPress={() => setOpenDropdown(null)}
+          >
+            <View style={dropdownStyles.modalContent}>
+              <Text style={dropdownStyles.modalTitle}>
+                {openDropdown === 'category' ? 'Select Category' : 'Select Province'}
+              </Text>
+              <ScrollView style={dropdownStyles.optionList}>
+                {dropdownOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      dropdownStyles.option,
+                      dropdownSelected === option && dropdownStyles.optionActive
+                    ]}
+                    onPress={() => handleOptionSelect(option)}
+                  >
+                    <Text
+                      style={[
+                        dropdownStyles.optionText,
+                        dropdownSelected === option && dropdownStyles.optionTextActive
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* Results Count */}
         <View style={styles.resultsContainer}>
@@ -249,3 +329,33 @@ export default function DestinationListScreen({ navigation }) {
     </SafeAreaView>
   );
 }
+
+// NEW: styles para sa dropdown row at modal (hiwalay sa listStyles)
+const dropdownStyles = StyleSheet.create({
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalContent: {
+    width: '80%',
+    maxWidth: 360,
+    maxHeight: '70%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16
+  },
+  modalTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: '#222' },
+  optionList: { flexGrow: 0 },
+  option: { paddingVertical: 12, paddingHorizontal: 10, borderRadius: 8 },
+  optionActive: { backgroundColor: '#e8f4ff' },
+  optionText: { fontSize: 15, color: '#333' },
+  optionTextActive: { color: '#007AFF', fontWeight: '600' }
+});
