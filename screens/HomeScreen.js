@@ -60,6 +60,18 @@ const notify = (title, message) => {
   }
 };
 
+// Confirm bago magbura (Alert.alert ay hindi gumagana sa web)
+const confirmAction = (title, message, onConfirm) => {
+  if (Platform.OS === 'web') {
+    if (window.confirm(`${title}\n${message}`)) onConfirm();
+  } else {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reset', style: 'destructive', onPress: onConfirm }
+    ]);
+  }
+};
+
 const MENU_ITEMS = [
   {
     key: 'list',
@@ -261,6 +273,19 @@ export default function HomeScreen({ navigation }) {
 
     closeSettings();
     notify('Success', 'Your password has been updated.');
+  };
+
+  const resetProgress = (what) => {
+    const label =
+      what === 'quiz' ? 'quiz progress' : what === 'game' ? 'game scores' : 'quiz progress and game scores';
+    confirmAction('Reset ' + label + '?', 'This cannot be undone. Your points will go back to 0.', async () => {
+      const { error } = await supabase.rpc('reset_my_progress', { what });
+      if (error) {
+        notify('Could not reset', error.message);
+        return;
+      }
+      notify('Done', 'Your ' + label + ' have been reset.');
+    });
   };
 
   const saveProfile = async () => {
@@ -595,6 +620,21 @@ export default function HomeScreen({ navigation }) {
               <Feather name={showPw ? 'eye-off' : 'eye'} size={14} color={COLORS.muted} />
               <Text style={styles.showPwText}>{showPw ? 'Hide passwords' : 'Show passwords'}</Text>
             </TouchableOpacity>
+
+            <View style={styles.resetSection}>
+              <Text style={styles.settingsSection}>Reset progress</Text>
+              <View style={styles.resetRow}>
+                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('quiz')}>
+                  <Text style={styles.resetBtnText}>Quiz</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('game')}>
+                  <Text style={styles.resetBtnText}>Game</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('all')}>
+                  <Text style={styles.resetBtnText}>Both</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity onPress={closeSettings} style={styles.modalBtn}>
@@ -955,5 +995,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.muted,
     marginLeft: 6
-  }
+  },
+    resetSection: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line
+  },
+  resetRow: { flexDirection: 'row', marginTop: 8 },
+  resetBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.vermilion,
+    borderRadius: 8,
+    paddingVertical: 9,
+    alignItems: 'center',
+    marginRight: 8
+  },
+  resetBtnText: { color: COLORS.vermilion, fontWeight: '700', fontSize: 13 }
 });
