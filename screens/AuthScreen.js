@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
-  KeyboardAvoidingView, Platform, Alert, ScrollView, SafeAreaView
+  KeyboardAvoidingView, Platform, Alert, ScrollView, SafeAreaView, Image
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SERIF } from '../theme';
@@ -51,6 +51,7 @@ export default function AuthScreen() {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <Image source={require('../assets/calabarzonlogo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.brand}>CALABARZON</Text>
           <Text style={styles.tagline}>Virtual Tour</Text>
           <View style={styles.goldRule} />
@@ -119,6 +120,7 @@ export default function AuthScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.taal },
   container: { flexGrow: 1, justifyContent: 'center', padding: 24 },
+  logo: { width: 96, height: 96, alignSelf: 'center', marginBottom: 12, borderRadius: 20 },
   brand: { fontFamily: SERIF, fontSize: 38, fontWeight: '700', color: COLORS.white, textAlign: 'center' },
   tagline: { fontSize: 15, color: '#E8D9AE', textAlign: 'center', marginTop: 2 },
   goldRule: { width: 48, height: 3, backgroundColor: COLORS.gold, alignSelf: 'center', marginVertical: 18 },
@@ -133,4 +135,5 @@ const styles = StyleSheet.create({
   btn: { backgroundColor: COLORS.taal, padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 4 },
   btnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
   link: { color: COLORS.goldDeep || COLORS.gold, textAlign: 'center', marginTop: 18, fontWeight: '600' }
+  
 });

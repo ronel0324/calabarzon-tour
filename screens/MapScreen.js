@@ -18,8 +18,16 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapWebView from '../components/MapWebView';
 import * as Location from 'expo-location';
-import { getAllDestinations, getEntryPanoramaPoint } from '../services/database';
+import {
+  getAllDestinations,
+  getEntryPanoramaPoint,
+  getQuizQuestionsByDestination,
+  saveQuizAnswers,
+  getQuizAnswersForQuestions
+} from '../services/database';
 import styles from '../styles/mapStyles';
+import detailStyles from '../styles/detailStyles';
+import MediaGalleryModal from '../components/MediaGalleryModal';
 
 const CALABARZON_CENTER = { latitude: 14.1008, longitude: 121.0794, zoom: 9 };
 
@@ -482,7 +490,10 @@ const menuStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  footerDoneText: { color: '#fff', fontWeight: '700' }
+  footerDoneText: { color: '#fff', fontWeight: '700' },
+  quizButton: { backgroundColor: '#F57C00' },
+  quizButtonDisabled: { backgroundColor: '#B0BEC5' },
+  mediaButton: { backgroundColor: '#5E35B1' }
 });
 
 const MapScreen = ({ navigation }) => {
@@ -495,6 +506,22 @@ const MapScreen = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showMenu, setShowMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Quiz: nasa loob ng MapScreen, hindi na lilipat ng screen
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [showMedia, setShowMedia] = useState(false);
+  const [quizDest, setQuizDest] = useState(null);
+  const [quizTotal, setQuizTotal] = useState(0); // lahat ng tanong ng destination
+  const [quizAnswered, setQuizAnswered] = useState(0); // ilan na ang nasagutan dati
+  const [quizQueue, setQuizQueue] = useState([]); // mga hindi pa nasasagutan
+  const [quizIndex, setQuizIndex] = useState(0);
+  const [quizSelected, setQuizSelected] = useState(null);
+  const [quizScore, setQuizScore] = useState(0);
+  const [quizCompleted, setQuizCompleted] = useState(false);
+  const [quizSaving, setQuizSaving] = useState(false);
+  // Status ng quiz ng napiling destination (para sa label ng button sa popup)
+  const [selectedQuizInfo, setSelectedQuizInfo] = useState({ total: 0, answered: 0, loaded: false });
+
   const activeFilterCount =
     (selectedProvince !== 'All' ? 1 : 0) + (selectedCategory !== 'All' ? 1 : 0);
 
@@ -656,10 +683,25 @@ const MapScreen = ({ navigation }) => {
           // Ilabas agad ang modal, saka hintayin ang panorama check
           setSelectedDestination(destination);
           setSelectedHasPanorama(false);
+          setSelectedQuizInfo({ total: 0, answered: 0, loaded: false });
           setShowInfoModal(true);
 
           const entry = await getEntryPanoramaPoint(destination.id);
           setSelectedHasPanorama(!!entry);
+
+          // Ilan ang tanong at ilan na ang nasagutan (galing quiz_answers)
+          try {
+            const questions = await getQuizQuestionsByDestination(destination.id);
+            const answers = await getQuizAnswersForQuestions(questions.map((q) => q.id));
+            setSelectedQuizInfo({
+              total: questions.length,
+              answered: answers.length,
+              loaded: true
+            });
+          } catch (quizError) {
+            console.error('Error loading quiz status:', quizError);
+            setSelectedQuizInfo({ total: 0, answered: 0, loaded: true });
+          }
         }
       } catch (error) {
         console.error('Error handling map message:', error);
@@ -689,9 +731,115 @@ const MapScreen = ({ navigation }) => {
     });
   };
 
+  // Simulan ang quiz dito mismo sa MapScreen (parehong logic sa DestinationDetailScreen)
+  const handleTakeQuiz = async () => {
+    const dest = selectedDestination;
+    if (!dest) return;
+
+    try {
+      const questions = await getQuizQuestionsByDestination(dest.id);
+      if (questions.length === 0) {
+        notify('No Quiz Available', 'This destination does not have a quiz yet.');
+        return;
+      }
+
+      // Mga tanong lang na hindi pa nasasagutan ang ilalabas (resume)
+      const answers = await getQuizAnswersForQuestions(questions.map((q) => q.id));
+      const answeredIds = new Set(answers.map((a) => a.question_id));
+      const remaining = questions.filter((q) => !answeredIds.has(q.id));
+
+      if (remaining.length === 0) {
+        notify('All done', 'You have answered every question for this destination.');
+        return;
+      }
+
+      setQuizDest(dest);
+      setQuizTotal(questions.length);
+      setQuizAnswered(answers.length);
+      setQuizQueue(remaining);
+      setQuizIndex(0);
+      setQuizSelected(null);
+      setQuizScore(0);
+      setQuizCompleted(false);
+
+      setShowInfoModal(false);
+      // Maikling antala para hindi mag-banggaan ang dalawang modal (lalo na sa iOS)
+      setTimeout(() => setShowQuiz(true), 300);
+    } catch (error) {
+      console.error('Error starting quiz:', error);
+      notify('Error', 'Could not load the quiz. Try again.');
+    }
+  };
+
+  const handleQuizNext = async () => {
+    if (!quizSelected) {
+      notify('Select an Answer', 'Please select an answer before proceeding.');
+      return;
+    }
+    if (quizSaving) return;
+
+    const currentQuestion = quizQueue[quizIndex];
+    const isCorrect = quizSelected === currentQuestion.correct_answer;
+
+    // I-save agad ang sagot para hindi mawala kapag lumabas ang user
+    setQuizSaving(true);
+    try {
+      await saveQuizAnswers([
+        {
+          question_id: currentQuestion.id,
+          selected_answer: quizSelected,
+          is_correct: isCorrect
+        }
+      ]);
+    } catch (error) {
+      console.error('Error saving answer:', error);
+      notify('Could not save answer', error.message || 'Try again.');
+      setQuizSaving(false);
+      return;
+    }
+    setQuizSaving(false);
+
+    if (isCorrect) setQuizScore((s) => s + 1);
+
+    if (quizIndex < quizQueue.length - 1) {
+      setQuizIndex(quizIndex + 1);
+      setQuizSelected(null);
+    } else {
+      setQuizCompleted(true);
+    }
+  };
+
+  const closeQuiz = () => {
+    setShowQuiz(false);
+    setQuizCompleted(false);
+    setQuizIndex(0);
+    setQuizSelected(null);
+    setQuizScore(0);
+  };
+
+  const handleOpenMedia = () => {
+  setShowInfoModal(false);
+  // Maikling antala para hindi mag-banggaan ang dalawang modal
+  setTimeout(() => setShowMedia(true), 300);
+};
+
   const centerOnCALABARZON = () => {
     runInMap('window.centerMap()');
   };
+
+  // Label ng quiz button: kapareho ng sa DestinationDetailScreen
+  const quizRemaining = selectedQuizInfo.total - selectedQuizInfo.answered;
+  const quizButtonDisabled =
+    !selectedQuizInfo.loaded || selectedQuizInfo.total === 0 || quizRemaining <= 0;
+  const quizButtonLabel = !selectedQuizInfo.loaded
+    ? '📝 Loading Quiz...'
+    : selectedQuizInfo.total === 0
+    ? '📝 No Quiz Available'
+    : selectedQuizInfo.answered === 0
+    ? `📝 Take Quiz (${selectedQuizInfo.total} questions)`
+    : quizRemaining > 0
+    ? `📝 Resume Quiz (${quizRemaining} left)`
+    : '✅ Quiz Completed';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -976,7 +1124,23 @@ const MapScreen = ({ navigation }) => {
                     >
                       <Text style={styles.modalButtonText}>📖 View Full Details</Text>
                     </TouchableOpacity>
-
+                    <TouchableOpacity
+                      style={[
+                        styles.modalButton,
+                        menuStyles.quizButton,
+                        quizButtonDisabled && menuStyles.quizButtonDisabled
+                      ]}
+                      onPress={handleTakeQuiz}
+                      disabled={quizButtonDisabled}
+                    >
+                      <Text style={styles.modalButtonText}>{quizButtonLabel}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, menuStyles.mediaButton]}
+                      onPress={handleOpenMedia}
+                    >
+                      <Text style={styles.modalButtonText}>🖼️ Media</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.modalButton, styles.closeButton]}
                       onPress={() => setShowInfoModal(false)}
@@ -989,6 +1153,105 @@ const MapScreen = ({ navigation }) => {
             </View>
           </View>
         </Modal>
+
+        {/* Quiz Modal: dito mismo sa MapScreen, parehong design ng DestinationDetailScreen */}
+        <Modal visible={showQuiz} animationType="slide" onRequestClose={closeQuiz}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+            {quizCompleted ? (
+              (() => {
+                const roundTotal = quizQueue.length;
+                const percentageScore = roundTotal
+                  ? Math.round((quizScore / roundTotal) * 100)
+                  : 0;
+                const passed = percentageScore >= 60;
+                return (
+                  <View style={detailStyles.resultContainer}>
+                    <Text style={detailStyles.resultTitle}>Quiz Completed! 🎉</Text>
+                    <Text style={detailStyles.resultScore}>
+                      {quizScore} / {roundTotal}
+                    </Text>
+                    <Text style={detailStyles.resultPercentage}>{percentageScore}%</Text>
+                    <Text
+                      style={[
+                        detailStyles.resultStatus,
+                        passed ? detailStyles.passed : detailStyles.failed
+                      ]}
+                    >
+                      {passed ? 'Congratulations! You passed!' : 'Keep learning!'}
+                    </Text>
+
+                    <TouchableOpacity style={detailStyles.backButton} onPress={closeQuiz}>
+                      <Text style={detailStyles.backButtonText}>Back to Map</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()
+            ) : (
+              quizQueue[quizIndex] && (
+                <View style={detailStyles.quizContainer}>
+                  <View style={detailStyles.quizHeader}>
+                    <Text style={detailStyles.quizProgress}>
+                      Question {quizAnswered + quizIndex + 1} of {quizTotal}
+                    </Text>
+                    <TouchableOpacity onPress={closeQuiz}>
+                      <Text style={detailStyles.closeButton}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={detailStyles.quizContent}>
+                    <Text style={detailStyles.questionText}>
+                      {quizQueue[quizIndex].question}
+                    </Text>
+
+                    <View style={detailStyles.optionsContainer}>
+                      {[
+                        { key: 'A', text: quizQueue[quizIndex].option_a },
+                        { key: 'B', text: quizQueue[quizIndex].option_b },
+                        { key: 'C', text: quizQueue[quizIndex].option_c },
+                        { key: 'D', text: quizQueue[quizIndex].option_d }
+                      ].map((option) => (
+                        <TouchableOpacity
+                          key={option.key}
+                          style={[
+                            detailStyles.optionButton,
+                            quizSelected === option.key && detailStyles.optionButtonSelected
+                          ]}
+                          onPress={() => setQuizSelected(option.key)}
+                        >
+                          <View style={detailStyles.optionContent}>
+                            <Text style={detailStyles.optionKey}>{option.key}</Text>
+                            <Text style={detailStyles.optionText}>{option.text}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <TouchableOpacity
+                      style={[detailStyles.nextButton, quizSaving && { opacity: 0.6 }]}
+                      onPress={handleQuizNext}
+                      disabled={quizSaving}
+                    >
+                      <Text style={detailStyles.nextButtonText}>
+                        {quizSaving
+                          ? 'Saving...'
+                          : quizIndex === quizQueue.length - 1
+                          ? 'Finish Quiz'
+                          : 'Next Question'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )
+            )}
+          </SafeAreaView>
+        </Modal>
+        {/* Media Modal */}
+
+        <MediaGalleryModal
+          visible={showMedia}
+          destination={selectedDestination}
+          onClose={() => setShowMedia(false)}
+        />
       </View>
     </SafeAreaView>
   );

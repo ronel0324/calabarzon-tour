@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,19 @@ import {
   ScrollView,
   Image,
   Platform,
+  Modal,
+  TextInput,
+  Pressable,
+  Alert,
+  KeyboardAvoidingView,
   useWindowDimensions
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+// Ayusin ang path na ito kung nasaan ang Supabase client mo
+import { supabase } from '../services/supabase';
 
 // Palette: hango sa Taal Lake, sa ginto ng araw sa watawat, at sa kulay ng Pahiyas
 const COLORS = {
@@ -36,6 +45,21 @@ const SERIF = Platform.select({
   default: 'serif'
 });
 
+const BANNER_KEY = 'home_banner';
+const DEFAULT_BANNER = {
+  title: 'CALABARZON Virtual Tour',
+  subtitle: 'Five provinces of heritage, history, and landscape'
+};
+
+// Alert.alert ay hindi gumagana sa web, kaya gumamit ng window.alert doon
+const notify = (title, message) => {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
 const MENU_ITEMS = [
   {
     key: 'list',
@@ -53,11 +77,18 @@ const MENU_ITEMS = [
     adminOnly: true
   },
   {
-    key: 'progress',
-    icon: '📊',
-    title: 'My Progress',
-    subtitle: 'Completed tours and quiz scores',
-    route: 'Progress'
+    key: 'quiz',
+    icon: '📝',
+    title: 'Quiz',
+    subtitle: 'Test your knowledge, province by province',
+    route: 'QuizProvinces'
+  },
+  {
+    key: 'game',
+    icon: '🎮',
+    title: 'Play Game',
+    subtitle: 'Guess the place from a photo',
+    route: 'GuessGame'
   }
 ];
 
@@ -82,9 +113,209 @@ const WeaveBand = () => {
 };
 
 export default function HomeScreen({ navigation }) {
-  const [aboutExpanded, setAboutExpanded] = useState(false);
+  const insets = useSafeAreaInsets();
   const { isAdmin, user, signOut } = useAuth();
   const visibleMenu = MENU_ITEMS.filter((item) => !item.adminOnly || isAdmin);
+
+  const [aboutExpanded, setAboutExpanded] = useState(false);
+
+  // Banner (editable ng admin)
+  const [banner, setBanner] = useState(DEFAULT_BANNER);
+  const [editVisible, setEditVisible] = useState(false);
+  const [draft, setDraft] = useState(DEFAULT_BANNER);
+
+  // Profile
+  const [profile, setProfile] = useState(null);
+  const [menuVisible, setMenuVisible] = useState(false);
+  const [profileVisible, setProfileVisible] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+
+  // Settings (palitan ang password)
+  const [settingsVisible, setSettingsVisible] = useState(false);
+  const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [showPw, setShowPw] = useState(false);
+
+  const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
+  const initial = displayName.charAt(0).toUpperCase();
+
+  // I-load ang banner: cache muna, tapos pinakabago mula sa Supabase
+  useEffect(() => {
+    (async () => {
+      try {
+        const cached = await AsyncStorage.getItem(BANNER_KEY);
+        if (cached) setBanner(JSON.parse(cached));
+      } catch (e) {}
+
+      const { data, error } = await supabase
+        .from('app_settings')
+        .select('value')
+        .eq('key', BANNER_KEY)
+        .single();
+      if (!error && data?.value) {
+        setBanner(data.value);
+        try {
+          await AsyncStorage.setItem(BANNER_KEY, JSON.stringify(data.value));
+        } catch (e) {}
+      }
+    })();
+  }, []);
+
+  // I-load ang profile ng user mula sa Supabase
+  useEffect(() => {
+    if (!user?.id) return;
+    const load = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', user.id)
+        .single();
+      if (!error && data) setProfile(data);
+    };
+    load();
+    return navigation.addListener('focus', load);
+  }, [navigation, user?.id]);
+
+  const openEdit = () => {
+    setDraft(banner);
+    setEditVisible(true);
+  };
+
+  const saveBanner = async () => {
+    const next = {
+      title: draft.title.trim() || DEFAULT_BANNER.title,
+      subtitle: draft.subtitle.trim()
+    };
+
+    const { error } = await supabase
+      .from('app_settings')
+      .upsert({ key: BANNER_KEY, value: next, updated_at: new Date().toISOString() });
+
+    if (error) {
+      notify('Could not save banner', error.message);
+      return;
+    }
+
+    setBanner(next);
+    setEditVisible(false);
+    try {
+      await AsyncStorage.setItem(BANNER_KEY, JSON.stringify(next));
+    } catch (e) {}
+  };
+
+  const openProfile = () => {
+    setMenuVisible(false);
+    navigation.navigate('Profile');
+  };
+
+  const openSettings = () => {
+    setMenuVisible(false);
+    setPw({ current: '', next: '', confirm: '' });
+    setShowPw(false);
+    setSettingsVisible(true);
+  };
+
+  const closeSettings = () => {
+    setSettingsVisible(false);
+    setPw({ current: '', next: '', confirm: '' });
+  };
+
+  const savePassword = async () => {
+    if (!pw.current || !pw.next || !pw.confirm) {
+      notify('Missing fields', 'Please fill in all password fields.');
+      return;
+    }
+    if (pw.next.length < 6) {
+      notify('Password too short', 'New password must be at least 6 characters.');
+      return;
+    }
+    if (pw.next !== pw.confirm) {
+      notify('Passwords do not match', 'New password and confirm password must be the same.');
+      return;
+    }
+    if (pw.next === pw.current) {
+      notify('Same password', 'New password must be different from your current password.');
+      return;
+    }
+
+    setPwSaving(true);
+
+    // I-verify muna ang current password
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: pw.current
+    });
+    if (verifyError) {
+      setPwSaving(false);
+      notify('Incorrect password', 'Your current password is wrong.');
+      return;
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: pw.next });
+    setPwSaving(false);
+
+    if (error) {
+      notify('Could not update password', error.message);
+      return;
+    }
+
+    closeSettings();
+    notify('Success', 'Your password has been updated.');
+  };
+
+  const saveProfile = async () => {
+    const name = nameDraft.trim();
+    const { error } = await supabase
+      .from('profiles')
+      .update({ full_name: name })
+      .eq('id', user.id);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+    setProfile((p) => ({ ...(p || {}), full_name: name }));
+    setProfileVisible(false);
+  };
+
+  // Header: title + edit icon (admin lang) sa gitna, avatar sa kanan
+  useEffect(() => {
+    navigation.setOptions({
+      title: banner.title,
+      headerTitle: () => (
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitleText} numberOfLines={1}>
+            {banner.title}
+          </Text>
+          {isAdmin && (
+            <TouchableOpacity
+              onPress={openEdit}
+              style={styles.headerEditBtn}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Edit banner"
+            >
+              <Feather name="edit" size={16} color={COLORS.gold} />
+            </TouchableOpacity>
+          )}
+        </View>
+      ),
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => setMenuVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Open profile menu"
+        >
+          <View style={styles.avatar}>
+            {profile?.avatar_url ? (
+              <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarInitial}>{initial}</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      )
+    });
+  }, [navigation, banner, isAdmin, profile, initial]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -102,10 +333,8 @@ export default function HomeScreen({ navigation }) {
           />
           <View style={styles.heroTint} />
           <View style={styles.heroTextBox}>
-            <Text style={styles.heroTitle}>Calabarzon</Text>
-            <Text style={styles.heroSubtitle}>
-              Five provinces of heritage, history, and landscape
-            </Text>
+            <Text style={styles.heroTitle}>{banner.title}</Text>
+            <Text style={styles.heroSubtitle}>{banner.subtitle}</Text>
           </View>
         </View>
         <WeaveBand />
@@ -199,20 +428,191 @@ export default function HomeScreen({ navigation }) {
               <Text style={styles.readMore}>{aboutExpanded ? 'Show less' : 'Read more'}</Text>
             </TouchableOpacity>
           </View>
-
-          <View style={styles.content}>
-          <Text style={{ color: COLORS.muted, fontSize: 13, textAlign: 'center' }}>
-            {user?.email} · {isAdmin ? 'Admin' : 'Viewer'}
-          </Text>
-          <TouchableOpacity onPress={signOut} style={{ alignItems: 'center', paddingVertical: 14 }}>
-            <Text style={{ color: COLORS.vermilion, fontWeight: '700' }}>Logout</Text>
-          </TouchableOpacity>
-        </View>
-
         </View>
 
         <WeaveBand />
       </ScrollView>
+
+      {/* Edit banner (admin) */}
+      <Modal
+        visible={editVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setEditVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Edit Banner</Text>
+
+            <Text style={styles.modalLabel}>Title</Text>
+            <TextInput
+              style={styles.input}
+              value={draft.title}
+              onChangeText={(t) => setDraft((d) => ({ ...d, title: t }))}
+              maxLength={40}
+            />
+
+            <Text style={styles.modalLabel}>Subtitle</Text>
+            <TextInput
+              style={[styles.input, { height: 70 }]}
+              value={draft.subtitle}
+              onChangeText={(t) => setDraft((d) => ({ ...d, subtitle: t }))}
+              multiline
+              maxLength={120}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setEditVisible(false)} style={styles.modalBtn}>
+                <Text style={{ color: COLORS.muted, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveBanner} style={[styles.modalBtn, styles.modalBtnPrimary]}>
+                <Text style={{ color: COLORS.white, fontWeight: '700' }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Dropdown ng avatar */}
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable style={styles.ddBackdrop} onPress={() => setMenuVisible(false)}>
+          <View style={[styles.ddCard, { top: insets.top + 56 }]}>
+            <Text style={styles.ddName} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <Text style={styles.ddEmail} numberOfLines={1}>
+              {user?.email} · {isAdmin ? 'Admin' : 'Viewer'}
+            </Text>
+            <View style={styles.ddDivider} />
+            <TouchableOpacity style={styles.ddItem} onPress={openProfile}>
+              <Text style={styles.ddItemText}>Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.ddItem} onPress={openSettings}>
+              <Text style={styles.ddItemText}>Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.ddItem}
+              onPress={() => {
+                setMenuVisible(false);
+                signOut();
+              }}
+            >
+              <Text style={[styles.ddItemText, { color: COLORS.vermilion }]}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Edit profile */}
+      <Modal
+        visible={profileVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProfileVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>My Profile</Text>
+
+            <Text style={styles.modalLabel}>Full name</Text>
+            <TextInput
+              style={styles.input}
+              value={nameDraft}
+              onChangeText={setNameDraft}
+              maxLength={60}
+              placeholder="Your name"
+            />
+
+            <Text style={styles.modalLabel}>Email</Text>
+            <Text style={[styles.input, { color: COLORS.muted }]}>{user?.email}</Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={() => setProfileVisible(false)} style={styles.modalBtn}>
+                <Text style={{ color: COLORS.muted, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveProfile} style={[styles.modalBtn, styles.modalBtnPrimary]}>
+                <Text style={{ color: COLORS.white, fontWeight: '700' }}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Settings: change password */}
+      <Modal
+        visible={settingsVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeSettings}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalBackdrop}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Settings</Text>
+            <Text style={styles.settingsSection}>Change password</Text>
+
+            <Text style={styles.modalLabel}>Current password</Text>
+            <TextInput
+              style={styles.input}
+              value={pw.current}
+              onChangeText={(t) => setPw((p) => ({ ...p, current: t }))}
+              secureTextEntry={!showPw}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Current password"
+            />
+
+            <Text style={styles.modalLabel}>New password</Text>
+            <TextInput
+              style={styles.input}
+              value={pw.next}
+              onChangeText={(t) => setPw((p) => ({ ...p, next: t }))}
+              secureTextEntry={!showPw}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="At least 6 characters"
+            />
+
+            <Text style={styles.modalLabel}>Confirm password</Text>
+            <TextInput
+              style={styles.input}
+              value={pw.confirm}
+              onChangeText={(t) => setPw((p) => ({ ...p, confirm: t }))}
+              secureTextEntry={!showPw}
+              autoCapitalize="none"
+              autoCorrect={false}
+              placeholder="Re-enter new password"
+            />
+
+            <TouchableOpacity onPress={() => setShowPw((v) => !v)} style={styles.showPwBtn}>
+              <Feather name={showPw ? 'eye-off' : 'eye'} size={14} color={COLORS.muted} />
+              <Text style={styles.showPwText}>{showPw ? 'Hide passwords' : 'Show passwords'}</Text>
+            </TouchableOpacity>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity onPress={closeSettings} style={styles.modalBtn}>
+                <Text style={{ color: COLORS.muted, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={savePassword}
+                disabled={pwSaving}
+                style={[styles.modalBtn, styles.modalBtnPrimary, pwSaving && { opacity: 0.6 }]}
+              >
+                <Text style={{ color: COLORS.white, fontWeight: '700' }}>
+                  {pwSaving ? 'Updating...' : 'Update password'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -229,6 +629,41 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: 0
+  },
+
+  // Header
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  headerTitleText: {
+    fontFamily: SERIF,
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.white
+  },
+  headerEditBtn: {
+    marginLeft: 8,
+    padding: 4
+  },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginRight: 14
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%'
+  },
+  avatarInitial: {
+    color: COLORS.taal,
+    fontWeight: '700',
+    fontSize: 16
   },
 
   // Hero
@@ -399,34 +834,6 @@ const styles = StyleSheet.create({
     marginLeft: 8
   },
 
-  // Province highlights
-  provinceRow: {
-    paddingHorizontal: 20,
-    paddingBottom: 6,
-    gap: 12
-  },
-  provinceCard: {
-    width: 210,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: COLORS.gold,
-    paddingVertical: 14,
-    paddingHorizontal: 14
-  },
-  provinceName: {
-    fontFamily: SERIF,
-    fontSize: 19,
-    fontWeight: '700',
-    color: COLORS.taal,
-    marginBottom: 6
-  },
-  provinceText: {
-    fontSize: 13,
-    lineHeight: 19,
-    color: COLORS.muted
-  },
-
   // About
   about: {
     marginTop: 18,
@@ -459,5 +866,94 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.goldDeep
+  },
+
+  // Dropdown ng avatar
+  ddBackdrop: {
+    flex: 1
+  },
+  ddCard: {
+    position: 'absolute',
+    right: 12,
+    width: 230,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    paddingVertical: 8,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 }
+  },
+  ddName: {
+    fontFamily: SERIF,
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.ink,
+    paddingHorizontal: 14,
+    paddingTop: 6
+  },
+  ddEmail: {
+    fontSize: 12,
+    color: COLORS.muted,
+    paddingHorizontal: 14,
+    marginTop: 2,
+    marginBottom: 8
+  },
+  ddDivider: {
+    height: 1,
+    backgroundColor: COLORS.line
+  },
+  ddItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14
+  },
+  ddItemText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.ink
+  },
+
+  // Modals
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 24
+  },
+  modalCard: { backgroundColor: COLORS.white, borderRadius: 14, padding: 20 },
+  modalTitle: { fontFamily: SERIF, fontSize: 20, fontWeight: '700', color: COLORS.ink, marginBottom: 12 },
+  modalLabel: { fontSize: 13, color: COLORS.muted, marginTop: 10, marginBottom: 4 },
+  input: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 15,
+    color: COLORS.ink
+  },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 },
+  modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, marginLeft: 8 },
+  modalBtnPrimary: { backgroundColor: COLORS.taal },
+
+  // Settings
+  settingsSection: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.goldDeep,
+    marginBottom: 2
+  },
+  showPwBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12
+  },
+  showPwText: {
+    fontSize: 13,
+    color: COLORS.muted,
+    marginLeft: 6
   }
 });

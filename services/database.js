@@ -217,94 +217,35 @@ export const getQuizQuestionsByDestination = async (destinationId) => {
   }
 };
 
-// ---------- Progress ----------
+export const saveQuizAnswers = async (answers) => {
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth?.user?.id;
+  if (!userId) throw new Error('Not signed in');
 
-export const saveProgress = async (destinationId, quizScore, completed = false) => {
-  try {
-    const { data: existing, error: findError } = await supabase
-      .from('user_progress')
-      .select('id')
-      .eq('destination_id', destinationId)
-      .limit(1)
-      .maybeSingle();
-    if (findError) throw findError;
-
-    const values = {
-      quiz_score: quizScore,
-      completed: completed ? 1 : 0,
-      completed_at: new Date().toISOString()
-    };
-
-    if (existing) {
-      const { error } = await supabase
-        .from('user_progress')
-        .update(values)
-        .eq('destination_id', destinationId);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('user_progress')
-        .insert({ destination_id: destinationId, ...values });
-      if (error) throw error;
-    }
-    return true;
-  } catch (error) {
-    console.error('Error saving progress:', error);
-    throw error;
-  }
+  const rows = answers.map((a) => ({ user_id: userId, ...a }));
+  const { error } = await supabase
+    .from('quiz_answers')
+    .upsert(rows, { onConflict: 'user_id,question_id', ignoreDuplicates: true });
+  if (error) throw error;
+  return true;
 };
 
-export const getProgress = async (destinationId) => {
-  try {
-    const { data, error } = await supabase
-      .from('user_progress')
-      .select('*')
-      .eq('destination_id', destinationId)
-      .limit(1)
-      .maybeSingle();
-    if (error) throw error;
-    return data;
-  } catch (error) {
-    console.error('Error getting progress:', error);
-    return null;
-  }
+// Mga sagot ng kasalukuyang user para sa listahan ng tanong
+export const getQuizAnswersForQuestions = async (questionIds) => {
+  if (!questionIds.length) return [];
+  const { data: auth } = await supabase.auth.getUser();
+  const userId = auth?.user?.id;
+  if (!userId) return [];
+
+  const { data, error } = await supabase
+    .from('quiz_answers')
+    .select('question_id, selected_answer, is_correct')
+    .eq('user_id', userId)
+    .in('question_id', questionIds);
+  if (error) throw error;
+  return data || [];
 };
 
-export const getAllProgress = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('user_progress')
-      .select('*, destinations(name)')
-      .order('completed_at', { ascending: false });
-    if (error) throw error;
-    return (data || []).map(({ destinations, ...up }) => ({
-      ...up,
-      destination_name: destinations?.name
-    }));
-  } catch (error) {
-    console.error('Error getting all progress:', error);
-    return [];
-  }
-};
-
-export const getCompletedDestinations = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('user_progress')
-      .select('*, destinations(*)')
-      .eq('completed', 1)
-      .order('completed_at', { ascending: false });
-    if (error) throw error;
-    // Pareho ng dati: ang id ay galing sa destination
-    return (data || []).map(({ destinations, ...up }) => ({
-      ...up,
-      ...(destinations || {})
-    }));
-  } catch (error) {
-    console.error('Error getting completed destinations:', error);
-    return [];
-  }
-};
 
 // ---------- Sample data ----------
 

@@ -15,10 +15,14 @@ import DestinationListScreen from './screens/DestinationListScreen';
 import DestinationDetailScreen from './screens/DestinationDetailScreen';
 import AddDestinationScreen from './screens/AddDestinationScreen';
 import EditDestinationScreen from './screens/EditDestinationScreen';
-import ProgressScreen from './screens/ProgressScreen';
 import MapScreen from './screens/MapScreen';
 import PanoramaViewScreen from './screens/PanoramaViewScreen';
 import AddQuizScreen from './screens/AddQuizScreen';
+import ProfileScreen from './screens/ProfileScreen';
+import QuizProvincesScreen from './screens/QuizProvincesScreen';
+import QuizPlayScreen from './screens/QuizPlayScreen';
+import GuessGameScreen from './screens/GuessGameScreen';
+import LeaderboardScreen from './screens/LeaderboardScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -48,9 +52,17 @@ function RootNavigator() {
             <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'CALABARZON Virtual Tour' }} />
             <Stack.Screen name="DestinationList" component={DestinationListScreen} options={{ title: 'Destinations' }} />
             <Stack.Screen name="DestinationDetail" component={DestinationDetailScreen} options={{ title: 'Destination Details' }} />
-            <Stack.Screen name="Progress" component={ProgressScreen} options={{ title: 'My Progress' }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile' }} />
             <Stack.Screen name="Map" component={MapScreen} options={{ title: 'Destination Map' }} />
             <Stack.Screen name="PanoramaView" component={PanoramaViewScreen} options={{ headerShown: false }} />
+            <Stack.Screen
+              name="QuizProvinces"
+              component={QuizProvincesScreen}
+              options={{ title: 'Quiz' }}
+            />
+            <Stack.Screen name="QuizPlay" component={QuizPlayScreen} />
+            <Stack.Screen name="GuessGame" component={GuessGameScreen} options={{ title: 'Guess the Place' }} />
+            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: 'Leaderboard' }} />
 
             {/* Admin lang (ikaw). Hindi man lang naka-register ang mga ito para sa viewers */}
             {isAdmin && (

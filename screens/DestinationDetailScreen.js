@@ -12,8 +12,8 @@ import {
 import {
   getDestinationById,
   getQuizQuestionsByDestination,
-  saveProgress,
-  getProgress,
+  saveQuizAnswers,
+  getQuizAnswersForQuestions,
   getEntryPanoramaPoint
 } from '../services/database';
 import styles from '../styles/detailStyles';
@@ -21,13 +21,15 @@ import styles from '../styles/detailStyles';
 export default function DestinationDetailScreen({ route, navigation }) {
   const { destinationId } = route.params;
   const [destination, setDestination] = useState(null);
-  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [quizQuestions, setQuizQuestions] = useState([]); // lahat ng tanong ng destination
+  const [answerStats, setAnswerStats] = useState({ answered: 0, correct: 0 }); // galing quiz_answers
+  const [quizQueue, setQuizQueue] = useState([]); // mga hindi pa nasasagutan (ito ang lalabas sa quiz)
   const [showQuiz, setShowQuiz] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [score, setScore] = useState(0);
+  const [score, setScore] = useState(0); // tama sa kasalukuyang round
   const [quizCompleted, setQuizCompleted] = useState(false);
-  const [progress, setProgress] = useState(null);
+  const [saving, setSaving] = useState(false);
   const [hasPanorama, setHasPanorama] = useState(false);
 
   useEffect(() => {
@@ -42,8 +44,11 @@ export default function DestinationDetailScreen({ route, navigation }) {
       const questions = await getQuizQuestionsByDestination(destinationId);
       setQuizQuestions(questions);
 
-      const prog = await getProgress(destinationId);
-      setProgress(prog);
+      const answers = await getQuizAnswersForQuestions(questions.map((q) => q.id));
+      setAnswerStats({
+        answered: answers.length,
+        correct: answers.filter((a) => a.is_correct).length
+      });
 
       const entry = await getEntryPanoramaPoint(destinationId);
       setHasPanorama(!!entry);
@@ -53,16 +58,33 @@ export default function DestinationDetailScreen({ route, navigation }) {
     }
   };
 
-  const startQuiz = () => {
+  const startQuiz = async () => {
     if (quizQuestions.length === 0) {
       Alert.alert('No Quiz Available', 'This destination does not have a quiz yet.');
       return;
     }
-    setShowQuiz(true);
-    setCurrentQuestionIndex(0);
-    setScore(0);
-    setSelectedAnswer(null);
-    setQuizCompleted(false);
+
+    try {
+      // Mga tanong lang na hindi pa nasasagutan ang ilalabas (resume)
+      const answers = await getQuizAnswersForQuestions(quizQuestions.map((q) => q.id));
+      const answeredIds = new Set(answers.map((a) => a.question_id));
+      const remaining = quizQuestions.filter((q) => !answeredIds.has(q.id));
+
+      if (remaining.length === 0) {
+        Alert.alert('All done', 'You have answered every question for this destination.');
+        return;
+      }
+
+      setQuizQueue(remaining);
+      setShowQuiz(true);
+      setCurrentQuestionIndex(0);
+      setScore(0);
+      setSelectedAnswer(null);
+      setQuizCompleted(false);
+    } catch (error) {
+      console.error('Error starting quiz:', error);
+      Alert.alert('Error', 'Could not load your quiz progress. Try again.');
+    }
   };
 
   const handleAnswerSelect = (answer) => {
@@ -74,30 +96,38 @@ export default function DestinationDetailScreen({ route, navigation }) {
       Alert.alert('Select an Answer', 'Please select an answer before proceeding.');
       return;
     }
+    if (saving) return;
 
-    const currentQuestion = quizQuestions[currentQuestionIndex];
-    let newScore = score;
+    const currentQuestion = quizQueue[currentQuestionIndex];
+    const isCorrect = selectedAnswer === currentQuestion.correct_answer;
 
-    if (selectedAnswer === currentQuestion.correct_answer) {
-      newScore = score + 1;
-      setScore(newScore);
+    // I-save agad ang sagot sa quiz_answers para hindi mawala kapag lumabas ang user
+    setSaving(true);
+    try {
+      await saveQuizAnswers([
+        {
+          question_id: currentQuestion.id,
+          selected_answer: selectedAnswer,
+          is_correct: isCorrect
+        }
+      ]);
+    } catch (error) {
+      console.error('Error saving answer:', error);
+      Alert.alert('Could not save answer', error.message || 'Try again.');
+      setSaving(false);
+      return;
     }
+    setSaving(false);
 
-    if (currentQuestionIndex < quizQuestions.length - 1) {
+    if (isCorrect) setScore((s) => s + 1);
+
+    if (currentQuestionIndex < quizQueue.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
-      } else {
-    // Quiz completed
+    } else {
+      // Tapos na ang round
       setQuizCompleted(true);
-      const percentageScore = Math.round((newScore / quizQuestions.length) * 100);
-      const completed = percentageScore >= 60;
-
-      try {
-        await saveProgress(destinationId, percentageScore, completed);
-        await loadDestinationData();
-      } catch (error) {
-        console.error('Error saving progress:', error);
-      }
+      loadDestinationData(); // i-refresh ang progress card
     }
   };
 
@@ -107,6 +137,7 @@ export default function DestinationDetailScreen({ route, navigation }) {
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setScore(0);
+    loadDestinationData(); // i-update ang progress kapag umalis sa gitna
   };
 
   const handleView360 = async () => {
@@ -131,7 +162,7 @@ export default function DestinationDetailScreen({ route, navigation }) {
   }
 
   if (showQuiz && !quizCompleted) {
-    const currentQuestion = quizQuestions[currentQuestionIndex];
+    const currentQuestion = quizQueue[currentQuestionIndex];
     const options = [
       { key: 'A', text: currentQuestion.option_a },
       { key: 'B', text: currentQuestion.option_b },
@@ -143,7 +174,7 @@ export default function DestinationDetailScreen({ route, navigation }) {
       <View style={styles.quizContainer}>
         <View style={styles.quizHeader}>
           <Text style={styles.quizProgress}>
-            Question {currentQuestionIndex + 1} of {quizQuestions.length}
+            Question {answerStats.answered + currentQuestionIndex + 1} of {quizQuestions.length}
           </Text>
           <TouchableOpacity onPress={closeQuiz}>
             <Text style={styles.closeButton}>✕</Text>
@@ -172,11 +203,16 @@ export default function DestinationDetailScreen({ route, navigation }) {
           </View>
 
           <TouchableOpacity
-            style={styles.nextButton}
+            style={[styles.nextButton, saving && { opacity: 0.6 }]}
             onPress={handleNextQuestion}
+            disabled={saving}
           >
             <Text style={styles.nextButtonText}>
-              {currentQuestionIndex === quizQuestions.length - 1 ? 'Finish Quiz' : 'Next Question'}
+              {saving
+                ? 'Saving...'
+                : currentQuestionIndex === quizQueue.length - 1
+                ? 'Finish Quiz'
+                : 'Next Question'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -185,16 +221,17 @@ export default function DestinationDetailScreen({ route, navigation }) {
   }
 
   if (quizCompleted) {
-    const percentageScore = Math.round((score / quizQuestions.length) * 100);
+    const roundTotal = quizQueue.length;
+    const percentageScore = roundTotal ? Math.round((score / roundTotal) * 100) : 0;
     const passed = percentageScore >= 60;
 
     return (
       <View style={styles.resultContainer}>
         <Text style={styles.resultTitle}>Quiz Completed! 🎉</Text>
-        <Text style={styles.resultScore}>{score} / {quizQuestions.length}</Text>
+        <Text style={styles.resultScore}>{score} / {roundTotal}</Text>
         <Text style={styles.resultPercentage}>{percentageScore}%</Text>
         <Text style={[styles.resultStatus, passed ? styles.passed : styles.failed]}>
-          {passed ? 'Congratulations! You passed!' : 'Keep learning and try again!'}
+          {passed ? 'Congratulations! You passed!' : 'Keep learning!'}
         </Text>
 
         <TouchableOpacity
@@ -203,16 +240,20 @@ export default function DestinationDetailScreen({ route, navigation }) {
         >
           <Text style={styles.backButtonText}>Back to Details</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={startQuiz}
-        >
-          <Text style={styles.retryButtonText}>Try Again</Text>
-        </TouchableOpacity>
       </View>
     );
   }
+
+  const total = quizQuestions.length;
+  const remainingCount = total - answerStats.answered;
+  const quizButtonLabel =
+    total === 0
+      ? 'No Quiz Available'
+      : answerStats.answered === 0
+      ? `Take Quiz (${total} questions)`
+      : remainingCount > 0
+      ? `Resume Quiz (${remainingCount} left)`
+      : 'Quiz Completed';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -231,12 +272,15 @@ export default function DestinationDetailScreen({ route, navigation }) {
         <Text style={styles.category}>{destination.category}</Text>
         <Text style={styles.address}>📍 {destination.address}</Text>
 
-        {progress && (
+        {answerStats.answered > 0 && (
           <View style={styles.progressCard}>
             <Text style={styles.progressTitle}>Your Progress</Text>
-            <Text style={styles.progressScore}>Quiz Score: {progress.quiz_score}%</Text>
+            <Text style={styles.progressScore}>
+              Answered: {answerStats.answered} / {total}
+            </Text>
             <Text style={styles.progressStatus}>
-              Status: {progress.completed ? '✅ Completed' : '⏳ In Progress'}
+              Correct: {answerStats.correct}
+              {remainingCount === 0 ? '  ✅ Completed' : '  ⏳ In Progress'}
             </Text>
           </View>
         )}
@@ -274,11 +318,7 @@ export default function DestinationDetailScreen({ route, navigation }) {
             style={styles.quizButton}
             onPress={startQuiz}
           >
-            <Text style={styles.quizButtonText}>
-              {quizQuestions.length > 0
-                ? `Take Quiz (${quizQuestions.length} questions)`
-                : 'No Quiz Available'}
-            </Text>
+            <Text style={styles.quizButtonText}>{quizButtonLabel}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
