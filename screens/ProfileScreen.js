@@ -26,7 +26,7 @@ import MediaGrid from '../components/MediaGrid';
 import MediaViewer from '../components/MediaViewer';
 import { fetchUserMedia, deleteMedia } from '../services/media';
 import { decode } from 'base64-arraybuffer';
-import * as FileSystem from 'expo-file-system/legacy';
+// Tinanggal na ang expo-file-system: native-only ito at sumisira sa web
 
 // Dapat tugma sa PROVINCES ng QuizProvincesScreen at sa destinations.province
 const PROVINCES = ['Cavite', 'Laguna', 'Batangas', 'Rizal', 'Quezon'];
@@ -45,6 +45,28 @@ const notify = (title, message) => {
   } else {
     Alert.alert(title, message);
   }
+};
+
+// Kunin ang bytes, content type, at extension ng napiling larawan.
+// Gumagana sa web at native, walang FileSystem.
+const getImageData = async (asset) => {
+  const contentType = asset.mimeType || 'image/jpeg';
+  const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
+
+  let buffer;
+  if (asset.base64) {
+    // Sa web, minsan may "data:image/...;base64," na prefix
+    const raw = asset.base64.includes(',') ? asset.base64.split(',')[1] : asset.base64;
+    buffer = decode(raw);
+  } else if (Platform.OS === 'web' && asset.uri) {
+    // Fallback sa web: basahin mula sa uri
+    const res = await fetch(asset.uri);
+    buffer = await res.arrayBuffer();
+  } else {
+    throw new Error('Could not read the selected image.');
+  }
+
+  return { buffer, contentType, ext };
 };
 
 export default function ProfileScreen() {
@@ -197,31 +219,34 @@ export default function ProfileScreen() {
   };
 
   const pickAvatar = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      notify('Permission needed', 'Allow photo access to change your avatar.');
-      return;
+    // Sa web, hindi kailangan ang permission request
+    if (Platform.OS !== 'web') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        notify('Permission needed', 'Allow photo access to change your avatar.');
+        return;
+      }
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7
+      quality: 0.7,
+      base64: true
     });
     if (result.canceled) return;
 
     setUploading(true);
     try {
       const asset = result.assets[0];
-      const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
-      const buffer = decode(b64);
+      const { buffer, contentType, ext } = await getImageData(asset);
 
       // Bagong filename bawat upload para hindi ma-cache ang lumang larawan
-      const path = `${user.id}/avatar-${Date.now()}.jpg`;
+      const path = `${user.id}/avatar-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(path, buffer, { contentType: 'image/jpeg' });
+        .upload(path, buffer, { contentType });
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
@@ -253,30 +278,33 @@ export default function ProfileScreen() {
   };
 
   const pickBanner = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      notify('Permission needed', 'Allow photo access to change your banner.');
-      return;
+    // Sa web, hindi kailangan ang permission request
+    if (Platform.OS !== 'web') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        notify('Permission needed', 'Allow photo access to change your banner.');
+        return;
+      }
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [2, 1],
-      quality: 0.7
+      quality: 0.7,
+      base64: true
     });
     if (result.canceled) return;
 
     setBannerUploading(true);
     try {
       const asset = result.assets[0];
-      const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
-      const buffer = decode(b64);
+      const { buffer, contentType, ext } = await getImageData(asset);
 
-      const path = `${user.id}/banner-${Date.now()}.jpg`;
+      const path = `${user.id}/banner-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(path, buffer, { contentType: 'image/jpeg' });
+        .upload(path, buffer, { contentType });
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage.from('avatars').getPublicUrl(path);
@@ -468,7 +496,7 @@ export default function ProfileScreen() {
 
         <View style={styles.goldRule} />
 
-        {/* Tabs: Quiz progress | Media */}
+        {/* Tabs: Quiz progress | Media | Leaderboard */}
         <View style={styles.tabBar}>
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'quiz' && styles.tabBtnActive]}
@@ -585,7 +613,7 @@ export default function ProfileScreen() {
               <ActivityIndicator color={COLORS.taal} style={{ marginTop: 20 }} />
             ) : board.length === 0 ? (
               <Text style={styles.empty}>
-                No scores yet. Play a game or answer a quiz to get on the board. on the board.
+                No scores yet. Play a game or answer a quiz to get on the board.
               </Text>
             ) : (
               <>
@@ -1062,11 +1090,6 @@ const styles = StyleSheet.create({
     fontSize: 16
   },
   boardSub: {
-    fontSize: 12,
-    color: COLORS.muted,
-    marginTop: 2
-  },
-    boardSub: {
     fontSize: 12,
     color: COLORS.muted,
     marginTop: 2
