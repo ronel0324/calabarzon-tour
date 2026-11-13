@@ -581,6 +581,20 @@ export default function HomeScreen({ navigation }) {
         >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Settings</Text>
+                        <View style={styles.resetSection}>
+              <Text style={styles.settingsSection}>Reset progress</Text>
+              <View style={styles.resetRow}>
+                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('quiz')}>
+                  <Text style={styles.resetBtnText}>Quiz</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('game')}>
+                  <Text style={styles.resetBtnText}>Game</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('all')}>
+                  <Text style={styles.resetBtnText}>Both</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
             <Text style={styles.settingsSection}>Change password</Text>
 
             <Text style={styles.modalLabel}>Current password</Text>
@@ -620,21 +634,6 @@ export default function HomeScreen({ navigation }) {
               <Feather name={showPw ? 'eye-off' : 'eye'} size={14} color={COLORS.muted} />
               <Text style={styles.showPwText}>{showPw ? 'Hide passwords' : 'Show passwords'}</Text>
             </TouchableOpacity>
-
-            <View style={styles.resetSection}>
-              <Text style={styles.settingsSection}>Reset progress</Text>
-              <View style={styles.resetRow}>
-                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('quiz')}>
-                  <Text style={styles.resetBtnText}>Quiz</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('game')}>
-                  <Text style={styles.resetBtnText}>Game</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.resetBtn} onPress={() => resetProgress('all')}>
-                  <Text style={styles.resetBtnText}>Both</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
 
             <View style={styles.modalActions}>
               <TouchableOpacity onPress={closeSettings} style={styles.modalBtn}>
