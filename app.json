@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "VirtualTourCalabarzon",
+    "name": "CALABARZON Virtual Tour",
     "slug": "VirtualTourCalabarzon",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -20,7 +20,7 @@
         "expo-build-properties",
         {
           "android": {
-            "enableProguardInReleaseBuilds": false,
+            "enableMinifyInReleaseBuilds": false,
             "enableShrinkResourcesInReleaseBuilds": false
           }
         }
@@ -40,19 +40,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#0f4a28",
+        "foregroundImage": "./assets/icon.png"
       },
       "package": "com.calabarzon.virtualtour",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "CAMERA",
-        "RECORD_AUDIO",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "RECORD_AUDIO"
       ],
       "config": {
         "googleMaps": {
@@ -67,6 +63,12 @@
       "eas": {
         "projectId": "d227592b-00cc-4049-bbf4-801402a314d1"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/d227592b-00cc-4049-bbf4-801402a314d1"
     }
   }
 }
