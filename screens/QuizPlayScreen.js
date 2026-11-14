@@ -36,6 +36,16 @@ const SERIF = Platform.select({
 });
 
 const norm = (s) => String(s || '').trim().toLowerCase();
+
+const shuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
 const KEYS = ['A', 'B', 'C', 'D'];
 
 const optionText = (q, key) => q[`option_${key.toLowerCase()}`];
@@ -91,12 +101,14 @@ export default function QuizPlayScreen({ route, navigation }) {
       aRes.data.map((a) => [a.question_id, { selected_answer: a.selected_answer, is_correct: a.is_correct }])
     );
 
-    // Magsimula sa unang hindi pa nasasagutan; kung tapos na lahat, sa "done" screen
-    const firstUnanswered = inProvince.findIndex((q) => !answerMap.has(q.id));
+    // Nasagutan na muna (para sa review), tapos ang hindi pa nasasagutan na naka-shuffle
+    const answered = inProvince.filter((q) => answerMap.has(q.id));
+    const unanswered = shuffle(inProvince.filter((q) => !answerMap.has(q.id)));
+    const ordered = [...answered, ...unanswered];
 
-    setQuestions(inProvince);
+    setQuestions(ordered);
     setAnswers(answerMap);
-    setPos(firstUnanswered === -1 ? inProvince.length : firstUnanswered);
+    setPos(answered.length); // simula sa unang hindi pa nasasagutan
     setLoading(false);
   }, [province, user?.id]);
 
