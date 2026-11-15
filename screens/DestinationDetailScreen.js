@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   SafeAreaView
 } from 'react-native';
+import { supabase } from '../services/supabase';
 import {
   getDestinationById,
   getQuizQuestionsByDestination,
@@ -57,6 +58,69 @@ export default function DestinationDetailScreen({ route, navigation }) {
       Alert.alert('Error', 'Failed to load destination details');
     }
   };
+
+    // Laging nakaturo sa pinakabagong loadDestinationData
+  const loadRef = useRef(loadDestinationData);
+  loadRef.current = loadDestinationData;
+
+  // Realtime: mag-refresh kapag may nagbago sa destination, quiz, o 360° view
+  useEffect(() => {
+    let timer;
+    const refresh = () => {
+      // Maikling antala para hindi sunod-sunod ang reload
+      clearTimeout(timer);
+      timer = setTimeout(() => loadRef.current(), 300);
+    };
+
+    const channel = supabase
+      .channel(`destination-detail-${destinationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'destinations',
+          filter: `id=eq.${destinationId}`
+        },
+        refresh
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'destinations' },
+        (payload) => {
+          // Nabura ang destination na tinitingnan: bumalik sa listahan
+          if (String(payload.old.id) === String(destinationId)) {
+            navigation.goBack();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'quiz_questions',
+          filter: `destination_id=eq.${destinationId}`
+        },
+        refresh
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'panorama_points',
+          filter: `destination_id=eq.${destinationId}`
+        },
+        refresh
+      )
+      .subscribe();
+
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [destinationId]);
 
   const startQuiz = async () => {
     if (quizQuestions.length === 0) {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,14 @@ import {
   Alert,
   Platform,
   SafeAreaView,
-  Modal // NEW: para sa category at province dropdown
+  Modal
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../services/supabase';
 import {
   getAllDestinations,
   searchDestinations,
-  filterDestinationsByCategory, // FIX: dati wala ito sa import
+  filterDestinationsByCategory,
   deleteDestination
 } from '../services/database';
 import styles from '../styles/listStyles';
@@ -82,6 +83,34 @@ export default function DestinationListScreen({ navigation }) {
     useCallback(() => {
       loadDestinations();
     }, [searchQuery, selectedCategory, selectedProvince]) // NEW: selectedProvince
+  );
+
+    // Laging nakaturo sa pinakabagong loadDestinations (kasama ang kasalukuyang filters)
+  const loadRef = useRef(loadDestinations);
+  loadRef.current = loadDestinations;
+
+  // Realtime: mag-refresh ang listahan kapag may nagbago sa destinations
+  useFocusEffect(
+    useCallback(() => {
+      let timer;
+      const channel = supabase
+        .channel('destinations-list-live')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'destinations' },
+          () => {
+            // Maikling antala para hindi sunod-sunod ang reload
+            clearTimeout(timer);
+            timer = setTimeout(() => loadRef.current(), 300);
+          }
+        )
+        .subscribe();
+
+      return () => {
+        clearTimeout(timer);
+        supabase.removeChannel(channel);
+      };
+    }, [])
   );
 
   const handleSearch = (text) => {
