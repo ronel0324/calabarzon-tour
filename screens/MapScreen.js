@@ -28,6 +28,7 @@ import {
 import styles from '../styles/mapStyles';
 import detailStyles from '../styles/detailStyles';
 import MediaGalleryModal from '../components/MediaGalleryModal';
+import { supabase } from '../services/supabase';
 
 const CALABARZON_CENTER = { latitude: 14.1008, longitude: 121.0794, zoom: 9 };
 
@@ -554,6 +555,39 @@ const MapScreen = ({ navigation }) => {
 
   useEffect(() => {
     loadDestinations();
+  }, []);
+
+  // Realtime: sumusunod ang mapa sa pagdagdag/pag-edit/pagbura ng destination
+  useEffect(() => {
+    const channel = supabase
+      .channel('destinations-live')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'destinations' },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            setDestinations((prev) =>
+              prev.filter((d) => String(d.id) !== String(payload.old.id))
+            );
+            return;
+          }
+
+          const row = payload.new;
+          const hasCoords = row.latitude && row.longitude;
+
+          setDestinations((prev) => {
+            const old = prev.find((d) => String(d.id) === String(row.id));
+            const without = prev.filter((d) => String(d.id) !== String(row.id));
+            // Walang coordinates = hindi ilalagay sa mapa (tulad ng loadDestinations)
+            return hasCoords ? [...without, { ...old, ...row }] : without;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Destinations na pasok sa napiling province at category
