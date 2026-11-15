@@ -42,6 +42,7 @@ export default function MediaViewer({ item, onClose, canDelete, onDelete }) {
 
   const mediaStyle = { width, height: height * 0.7 };
   const caption = item.destinations?.name;
+  const username = item.profiles?.username; // <-- BAGO
   const date = item.created_at ? new Date(item.created_at).toLocaleDateString() : '';
 
   const handleDelete = () =>
@@ -84,6 +85,7 @@ export default function MediaViewer({ item, onClose, canDelete, onDelete }) {
           </View>
 
           <View style={styles.bottom}>
+            {!!username && <Text style={styles.username}>@{username}</Text>}{/* <-- BAGO */}
             {!!caption && <Text style={styles.caption}>{caption}</Text>}
             {!!date && <Text style={styles.date}>{date}</Text>}
           </View>
@@ -104,6 +106,7 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bottom: { paddingHorizontal: 20, paddingBottom: 16, alignItems: 'center' },
+  username: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 2 }, // <-- BAGO
   caption: { color: '#fff', fontSize: 16, fontWeight: '700' },
   date: { color: '#9FB3B6', fontSize: 12, marginTop: 2 }
 });

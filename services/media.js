@@ -19,7 +19,7 @@ const FIELDS = 'id, user_id, media_type, url, storage_path, created_at';
 export async function fetchDestinationMedia(destinationId) {
   const { data, error } = await supabase
     .from('destination_media')
-    .select(FIELDS)
+    .select(`${FIELDS}, profiles(username)`)
     .eq('destination_id', destinationId)
     .order('created_at', { ascending: false })
     .limit(100);
@@ -31,7 +31,7 @@ export async function fetchDestinationMedia(destinationId) {
 export async function fetchUserMedia(userId) {
   const { data, error } = await supabase
     .from('destination_media')
-    .select(`${FIELDS}, destination_id, destinations(name)`)
+    .select(`${FIELDS}, destination_id, destinations(name), profiles(username)`)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(100);
