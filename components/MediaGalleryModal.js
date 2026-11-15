@@ -17,6 +17,7 @@ import { COLORS } from '../theme';
 import MediaGrid from './MediaGrid';
 import MediaViewer, { VideoPlayer } from './MediaViewer';
 import { fetchDestinationMedia, uploadMedia, deleteMedia, notify } from '../services/media';
+import { supabase } from '../services/supabase';
 
 const PAD = 3;
 
@@ -41,6 +42,43 @@ export default function MediaGalleryModal({ visible, destination, onClose }) {
       .finally(() => alive && setLoading(false));
     return () => {
       alive = false;
+    };
+  }, [visible, destination?.id]);
+
+  useEffect(() => {
+    if (!visible || !destination?.id) return;
+
+    const channel = supabase
+      .channel(`media-${destination.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'destination_media',
+          filter: `destination_id=eq.${destination.id}`
+        },
+        async (payload) => {
+          const { data } = await supabase
+            .from('destination_media')
+            .select('id, user_id, media_type, url, storage_path, created_at, profiles(username)')
+            .eq('id', payload.new.id)
+            .single();
+          if (!data) return;
+          setItems((prev) => (prev.some((m) => m.id === data.id) ? prev : [data, ...prev]));
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'destination_media' },
+        (payload) => {
+          setItems((prev) => prev.filter((m) => m.id !== payload.old.id));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
     };
   }, [visible, destination?.id]);
 
