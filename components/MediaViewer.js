@@ -39,6 +39,7 @@ export default function MediaViewer({ item, onClose, canDelete, onDelete }) {
   const [busy, setBusy] = useState(false);
 
   if (!item) return null;
+  console.log('MEDIA ITEM:', JSON.stringify(item, null, 2));
 
   const mediaStyle = { width, height: height * 0.7 };
   const caption = item.destinations?.name;
