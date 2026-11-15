@@ -239,7 +239,7 @@ export default function EditDestinationScreen({ route, navigation }) {
             onChangeText={(text) => handleInputChange('name', text)}
           />
 
-          <Text style={styles.label}>Category * (pwede more than one)</Text>
+          <Text style={styles.label}>Category * (multiple)</Text>
           <View style={styles.categoryContainer}>
             {CATEGORIES.map((category) => {
               const selected = formData.categories.includes(category);
