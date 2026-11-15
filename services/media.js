@@ -40,16 +40,25 @@ export async function fetchUserMedia(userId) {
 }
 
 export async function uploadMedia({ asset, destinationId, userId }) {
-  const isVideo = asset.type === 'video';
-  const contentType = isVideo ? 'video/mp4' : 'image/jpeg';
+  const mime = asset.mimeType || '';
+  const isVideo = asset.type === 'video' || mime.startsWith('video/');
+  const contentType = mime || (isVideo ? 'video/mp4' : 'image/jpeg');
+  const ext = (contentType.split('/')[1] || (isVideo ? 'mp4' : 'jpg'))
+    .replace('jpeg', 'jpg')
+    .replace('quicktime', 'mov');
 
-  const ext = isVideo ? 'mp4' : 'jpg';
-
-  const b64 = await FileSystem.readAsStringAsync(asset.uri, {
-    encoding: 'base64'
-  });
-  const buffer = decode(b64);
-  console.log('FS upload bytes:', buffer.byteLength, asset.type);
+  // Iba ang paraan ng pagbasa ng file depende sa platform
+  let buffer;
+  if (Platform.OS === 'web') {
+    const res = await fetch(asset.uri);
+    buffer = await res.arrayBuffer();
+  } else {
+    const b64 = await FileSystem.readAsStringAsync(asset.uri, {
+      encoding: 'base64',
+    });
+    buffer = decode(b64);
+  }
+  console.log('upload bytes:', buffer.byteLength, contentType);
 
   // userId muna sa path para tugma sa storage policy
   const path = `${userId}/${destinationId}/${Date.now()}.${ext}`;
@@ -67,7 +76,7 @@ export async function uploadMedia({ asset, destinationId, userId }) {
       user_id: userId,
       media_type: isVideo ? 'video' : 'photo',
       url: pub.publicUrl,
-      storage_path: path
+      storage_path: path,
     })
     .select(FIELDS)
     .single();
