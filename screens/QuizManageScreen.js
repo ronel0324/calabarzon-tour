@@ -41,6 +41,32 @@ const KEYS = ['A', 'B', 'C', 'D'];
 const norm = (s) => String(s || '').trim().toLowerCase();
 const optionText = (q, key) => q[`option_${key.toLowerCase()}`];
 
+// Gumagana sa web at sa phone
+const showAlert = (title, message) => {
+  if (Platform.OS === 'web') {
+    window.alert(message ? `${title}\n\n${message}` : title);
+  } else {
+    Alert.alert(title, message);
+  }
+};
+
+const confirmAsync = (title, message) =>
+  Platform.OS === 'web'
+    ? Promise.resolve(window.confirm(message ? `${title}\n\n${message}` : title))
+    : new Promise((resolve) =>
+        Alert.alert(
+          title,
+          message,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Delete', style: 'destructive', onPress: () => resolve(true) }
+          ],
+          { cancelable: true, onDismiss: () => resolve(false) }
+        )
+      );
+
+const errText = (error) => `${error.message}\n${error.details || ''}\n${error.code || ''}`;
+
 // Suportado ang correct_answer na letter ("B") o mismong text ng sagot
 const correctKeyOf = (q) => {
   const ca = String(q.correct_answer || '').trim();
@@ -130,42 +156,66 @@ export default function QuizManageScreen({ route, navigation }) {
     navigation.setOptions({ title: `Manage ${province}` });
   }, [navigation, province]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data: dests, error: dErr } = await supabase
-      .from('destinations')
-      .select('id, name, province')
-      .ilike('province', province)
-      .order('name');
-    if (dErr) {
-      Alert.alert('Error', dErr.message);
-      setLoading(false);
-      return;
-    }
-    setDestinations(dests || []);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      const { data: dests, error: dErr } = await supabase
+        .from('destinations')
+        .select('id, name, province')
+        .ilike('province', province)
+        .order('name');
+      if (dErr) {
+        showAlert('Error', dErr.message);
+        setLoading(false);
+        return;
+      }
+      setDestinations(dests || []);
 
-    const ids = (dests || []).map((d) => d.id);
-    if (ids.length === 0) {
-      setQuestions([]);
-      setLoading(false);
-      return;
-    }
+      const ids = (dests || []).map((d) => d.id);
+      if (ids.length === 0) {
+        setQuestions([]);
+        setLoading(false);
+        return;
+      }
 
-    const { data: qs, error: qErr } = await supabase
-      .from('quiz_questions')
-      .select('id, destination_id, question, option_a, option_b, option_c, option_d, correct_answer')
-      .in('destination_id', ids)
-      .order('id', { ascending: true });
-    if (qErr) Alert.alert('Error', qErr.message);
-    setQuestions(qs || []);
-    setLoading(false);
-  }, [province]);
+      const { data: qs, error: qErr } = await supabase
+        .from('quiz_questions')
+        .select('id, destination_id, question, option_a, option_b, option_c, option_d, correct_answer')
+        .in('destination_id', ids)
+        .order('id', { ascending: true });
+      if (qErr) showAlert('Error', qErr.message);
+      setQuestions(qs || []);
+      setLoading(false);
+    },
+    [province]
+  );
 
   useFocusEffect(
     useCallback(() => {
       load();
     }, [load])
   );
+
+  // Realtime: mag-a-update agad kapag may insert/update/delete (may debounce)
+  useEffect(() => {
+    let timer;
+    const channel = supabase
+      .channel(`quiz_questions_${province}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'quiz_questions' },
+        () => {
+          clearTimeout(timer);
+          timer = setTimeout(() => load(true), 500);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [province, load]);
 
   const destName = (id) => destinations.find((d) => d.id === id)?.name || 'Unknown';
   const countFor = (destId) => questions.filter((q) => q.destination_id === destId).length;
@@ -198,9 +248,9 @@ export default function QuizManageScreen({ route, navigation }) {
 
   const save = async () => {
     const { id, destination_id, question, option_a, option_b, option_c, option_d, correct_answer } = form;
-    if (!destination_id) return Alert.alert('Piliin muna ang destination');
+    if (!destination_id) return showAlert('Piliin muna ang destination');
     if (![question, option_a, option_b, option_c, option_d].every((v) => String(v).trim())) {
-      return Alert.alert('Punuin lahat ng fields');
+      return showAlert('Punuin lahat ng fields');
     }
 
     const payload = {
@@ -219,34 +269,29 @@ export default function QuizManageScreen({ route, navigation }) {
       : await supabase.from('quiz_questions').insert(payload).select();
     setSaving(false);
 
-    if (error) return Alert.alert('Error', error.message);
+    if (error) return showAlert('Error', errText(error));
     if (!data || data.length === 0) {
-      return Alert.alert('Hindi na-save', 'Na-block ng database (RLS). I-check ang admin policies sa quiz_questions.');
+      return showAlert('Hindi na-save', 'Na-block ng database (RLS). I-check ang admin policies sa quiz_questions.');
     }
     setModalVisible(false);
-    load();
+    load(true);
   };
 
-  const confirmDelete = (q) => {
-    Alert.alert('Delete question?', q.question, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const { data, error } = await supabase
-            .from('quiz_questions')
-            .delete()
-            .eq('id', q.id)
-            .select();
-          if (error) return Alert.alert('Error', error.message);
-          if (!data || data.length === 0) {
-            return Alert.alert('Hindi na-delete', 'Na-block ng database (RLS). I-check ang admin policies.');
-          }
-          load();
-        }
-      }
-    ]);
+  const confirmDelete = async (q) => {
+    const ok = await confirmAsync('Delete question?', q.question);
+    if (!ok) return;
+
+    const { data, error } = await supabase
+      .from('quiz_questions')
+      .delete()
+      .eq('id', q.id)
+      .select();
+
+    if (error) return showAlert('Error', errText(error));
+    if (!data || data.length === 0) {
+      return showAlert('Hindi na-delete', 'Na-block ng database (RLS). I-check ang admin policies.');
+    }
+    load(true);
   };
 
   // ---------- BULK UPLOAD ----------
@@ -289,15 +334,15 @@ export default function QuizManageScreen({ route, navigation }) {
     } catch (e) {
       setBulkRows([]);
       setBulkErrors([]);
-      Alert.alert('Hindi mabasa ang file', e?.message || 'Subukan ulit.');
+      showAlert('Hindi mabasa ang file', e?.message || 'Subukan ulit.');
     } finally {
       setReading(false);
     }
   };
 
   const importRows = async () => {
-    if (!bulkDest) return Alert.alert('Piliin muna ang destination');
-    if (bulkRows.length === 0) return Alert.alert('Walang valid na rows na i-import');
+    if (!bulkDest) return showAlert('Piliin muna ang destination');
+    if (bulkRows.length === 0) return showAlert('Walang valid na rows na i-import');
 
     setImporting(true);
     const payload = bulkRows.map((r) => ({ ...r, destination_id: bulkDest }));
@@ -308,17 +353,17 @@ export default function QuizManageScreen({ route, navigation }) {
       const { data, error } = await supabase.from('quiz_questions').insert(chunk).select();
       if (error || !data || data.length === 0) {
         setImporting(false);
-        load();
-        return Alert.alert(
+        load(true);
+        return showAlert(
           'Hindi natapos ang import',
-          error?.message || 'Na-block ng database (RLS). I-check ang admin policies sa quiz_questions.'
+          error ? errText(error) : 'Na-block ng database (RLS). I-check ang admin policies sa quiz_questions.'
         );
       }
     }
     setImporting(false);
     setBulkVisible(false);
-    Alert.alert('Tapos na', `${payload.length} questions ang naidagdag sa ${destName(bulkDest)}.`);
-    load();
+    showAlert('Tapos na', `${payload.length} questions ang naidagdag sa ${destName(bulkDest)}.`);
+    load(true);
   };
 
   return (

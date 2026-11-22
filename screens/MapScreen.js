@@ -944,9 +944,6 @@ const MapScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.controlButton} onPress={() => getUserLocation(true)}>
               <Text style={styles.controlButtonText}>📍 My Location</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.controlButton} onPress={loadDestinations}>
-              <Text style={styles.controlButtonText}>🔄 Reload</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Destination Counter */}

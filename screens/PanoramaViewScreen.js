@@ -97,6 +97,28 @@ const PanoramaViewScreen = ({ route, navigation }) => {
     loadAllPoints();
   }, [entryPointId]);
 
+  // Web lang: i-paste ang kinopyang larawan (Ctrl+V) habang bukas ang Info form
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !formVisible) return;
+
+    const onPaste = (e) => {
+      const items = (e.clipboardData && e.clipboardData.items) || [];
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            uploadFromUri(URL.createObjectURL(file));
+          }
+          return;
+        }
+      }
+    };
+
+    document.addEventListener('paste', onPaste);
+    return () => document.removeEventListener('paste', onPaste);
+  }, [formVisible]);
+
   const loadAllPoints = async () => {
     try {
       const points = await getPanoramaPointsByDestination(destinationId);
@@ -252,24 +274,15 @@ const PanoramaViewScreen = ({ route, navigation }) => {
     setEditingId(null);
   };
 
-  const pickImage = async () => {
+  const uploadFromUri = async (uri, width) => {
     try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        quality: 1
-      });
-      if (result.canceled) return;
-      const asset = result.assets[0];
       setUploading(true);
-
       // Paliitin muna: 1600 px ang lapad (hindi ginagalaw kung mas maliit na)
-      const actions = asset.width && asset.width > 1600
-        ? [{ resize: { width: 1600 } }]
-        : [];
-      const resized = await ImageManipulator.manipulateAsync(asset.uri, actions, {
+      const actions = width && width > 1600 ? [{ resize: { width: 1600 } }] : [];
+      const resized = await ImageManipulator.manipulateAsync(uri, actions, {
         compress: 0.8,
         format: ImageManipulator.SaveFormat.JPEG
       });
-
       const url = await uploadImage(resized.uri);
       setFormImageUrl(url);
     } catch (error) {
@@ -278,6 +291,13 @@ const PanoramaViewScreen = ({ route, navigation }) => {
     } finally {
       setUploading(false);
     }
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 1 });
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    await uploadFromUri(asset.uri, asset.width);
   };
 
   const closeLinkForm = () => {
@@ -824,6 +844,11 @@ const PanoramaViewScreen = ({ route, navigation }) => {
                   {uploading ? 'Uploading...' : '📷 Pumili ng larawan'}
                 </Text>
               </TouchableOpacity>
+              {Platform.OS === 'web' && (
+                <Text style={styles.fieldHint}>
+                  Puwede ring mag-Ctrl+V ng kinopyang larawan dito.
+                </Text>
+              )}
               {!!formImageUrl && (
                 <Image
                   source={{ uri: formImageUrl }}
@@ -831,15 +856,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
                   resizeMode="contain"
                 />
               )}
-              <TextInput
-                style={styles.input}
-                placeholder="Image URL (optional)"
-                placeholderTextColor="#999"
-                value={formImageUrl}
-                onChangeText={setFormImageUrl}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
             </ScrollView>
 
             <View style={styles.formButtons}>
