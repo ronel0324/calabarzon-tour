@@ -13,6 +13,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as XLSX from 'xlsx';
 import { supabase } from '../services/supabase';
 
 const COLORS = {
@@ -57,6 +59,49 @@ const EMPTY_FORM = {
   correct_answer: 'A'
 };
 
+// Binabasa ang rows mula sa Excel: A=Question, B-E=Options A-D, F=Answer key
+const parseRows = (rows) => {
+  const valid = [];
+  const errors = [];
+
+  rows.forEach((r, i) => {
+    const cells = [0, 1, 2, 3, 4, 5].map((c) => String(r?.[c] ?? '').trim());
+    if (cells.every((c) => !c)) return; // blangkong row
+    if (i === 0 && /^question/i.test(cells[0])) return; // header row
+
+    const [question, a, b, c, d, ans] = cells;
+    const rowNo = i + 1;
+
+    if (!question || !a || !b || !c || !d || !ans) {
+      errors.push(`Row ${rowNo}: kulang ang laman`);
+      return;
+    }
+
+    const opts = [a, b, c, d];
+    let key = null;
+    if (/^[a-d]$/i.test(ans)) key = ans.toUpperCase();
+    else {
+      const idx = opts.findIndex((o) => norm(o) === norm(ans));
+      if (idx >= 0) key = KEYS[idx];
+    }
+    if (!key) {
+      errors.push(`Row ${rowNo}: hindi tugma ang answer key ("${ans}")`);
+      return;
+    }
+
+    valid.push({
+      question,
+      option_a: a,
+      option_b: b,
+      option_c: c,
+      option_d: d,
+      correct_answer: key
+    });
+  });
+
+  return { valid, errors };
+};
+
 export default function QuizManageScreen({ route, navigation }) {
   const { province } = route.params;
 
@@ -69,6 +114,17 @@ export default function QuizManageScreen({ route, navigation }) {
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [destSearch, setDestSearch] = useState('');
+
+  // Bulk upload states
+  const [bulkVisible, setBulkVisible] = useState(false);
+  const [bulkDest, setBulkDest] = useState(null);
+  const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
+  const [bulkSearch, setBulkSearch] = useState('');
+  const [bulkFile, setBulkFile] = useState('');
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkErrors, setBulkErrors] = useState([]);
+  const [reading, setReading] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     navigation.setOptions({ title: `Manage ${province}` });
@@ -193,6 +249,78 @@ export default function QuizManageScreen({ route, navigation }) {
     ]);
   };
 
+  // ---------- BULK UPLOAD ----------
+  const openBulk = () => {
+    setBulkDest(filterDest ?? destinations[0]?.id ?? null);
+    setBulkPickerOpen(false);
+    setBulkSearch('');
+    setBulkFile('');
+    setBulkRows([]);
+    setBulkErrors([]);
+    setBulkVisible(true);
+  };
+
+  const pickFile = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: [
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+          'application/vnd.ms-excel', // .xls
+          'text/csv',
+          'text/comma-separated-values'
+        ],
+        copyToCacheDirectory: true
+      });
+      if (res.canceled || !res.assets?.length) return;
+
+      const asset = res.assets[0];
+      setReading(true);
+      setBulkFile(asset.name || 'file');
+
+      const response = await fetch(asset.uri);
+      const buffer = await response.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+      const { valid, errors } = parseRows(rows);
+      setBulkRows(valid);
+      setBulkErrors(errors);
+    } catch (e) {
+      setBulkRows([]);
+      setBulkErrors([]);
+      Alert.alert('Hindi mabasa ang file', e?.message || 'Subukan ulit.');
+    } finally {
+      setReading(false);
+    }
+  };
+
+  const importRows = async () => {
+    if (!bulkDest) return Alert.alert('Piliin muna ang destination');
+    if (bulkRows.length === 0) return Alert.alert('Walang valid na rows na i-import');
+
+    setImporting(true);
+    const payload = bulkRows.map((r) => ({ ...r, destination_id: bulkDest }));
+
+    // Hatiin sa 100 bawat insert
+    for (let i = 0; i < payload.length; i += 100) {
+      const chunk = payload.slice(i, i + 100);
+      const { data, error } = await supabase.from('quiz_questions').insert(chunk).select();
+      if (error || !data || data.length === 0) {
+        setImporting(false);
+        load();
+        return Alert.alert(
+          'Hindi natapos ang import',
+          error?.message || 'Na-block ng database (RLS). I-check ang admin policies sa quiz_questions.'
+        );
+      }
+    }
+    setImporting(false);
+    setBulkVisible(false);
+    Alert.alert('Tapos na', `${payload.length} questions ang naidagdag sa ${destName(bulkDest)}.`);
+    load();
+  };
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['bottom']}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -202,13 +330,22 @@ export default function QuizManageScreen({ route, navigation }) {
           {destinations.length === 1 ? '' : 's'}
         </Text>
 
-        <TouchableOpacity
-          style={[styles.addBtn, !destinations.length && { opacity: 0.5 }]}
-          onPress={openAdd}
-          disabled={!destinations.length}
-        >
-          <Text style={styles.addText}>+ Add Question</Text>
-        </TouchableOpacity>
+        <View style={styles.topRow}>
+          <TouchableOpacity
+            style={[styles.addBtn, { flex: 1 }, !destinations.length && { opacity: 0.5 }]}
+            onPress={openAdd}
+            disabled={!destinations.length}
+          >
+            <Text style={styles.addText}>+ Add Question</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.bulkBtn, { flex: 1 }, !destinations.length && { opacity: 0.5 }]}
+            onPress={openBulk}
+            disabled={!destinations.length}
+          >
+            <Text style={styles.bulkBtnText}>⬆ Bulk Upload</Text>
+          </TouchableOpacity>
+        </View>
 
         {destinations.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
@@ -267,6 +404,7 @@ export default function QuizManageScreen({ route, navigation }) {
         )}
       </ScrollView>
 
+      {/* ADD / EDIT MODAL */}
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -371,6 +509,131 @@ export default function QuizManageScreen({ route, navigation }) {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* BULK UPLOAD MODAL */}
+      <Modal visible={bulkVisible} animationType="slide" onRequestClose={() => setBulkVisible(false)}>
+        <SafeAreaView style={styles.safeArea}>
+          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <Text style={styles.heading}>Bulk Upload (Excel)</Text>
+
+            <View style={styles.formatBox}>
+              <Text style={styles.formatTitle}>Format ng Excel</Text>
+              <Text style={styles.formatText}>A: Question</Text>
+              <Text style={styles.formatText}>B: Option A    C: Option B    D: Option C    E: Option D</Text>
+              <Text style={styles.formatText}>F: Answer key (A, B, C, D o mismong text ng sagot)</Text>
+              <Text style={[styles.formatText, { marginTop: 6 }]}>
+                Isang row = isang tanong. Pwede ang header sa row 1 (nagsisimula sa "Question").
+              </Text>
+            </View>
+
+            <Text style={styles.label}>Destination (dito mapupunta lahat)</Text>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setBulkPickerOpen((o) => !o)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.dropdownText} numberOfLines={1}>
+                {bulkDest ? `${destName(bulkDest)} (${countFor(bulkDest)})` : 'Pumili ng destination'}
+              </Text>
+              <Text style={styles.dropdownArrow}>{bulkPickerOpen ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {bulkPickerOpen && (
+              <View style={styles.dropdownList}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Maghanap ng destination..."
+                  placeholderTextColor={COLORS.muted}
+                  value={bulkSearch}
+                  onChangeText={setBulkSearch}
+                />
+                {destinations
+                  .filter((d) => norm(d.name).includes(norm(bulkSearch)))
+                  .map((d) => {
+                    const selected = bulkDest === d.id;
+                    return (
+                      <TouchableOpacity
+                        key={d.id}
+                        style={[styles.dropdownItem, selected && styles.dropdownItemActive]}
+                        onPress={() => {
+                          setBulkDest(d.id);
+                          setBulkPickerOpen(false);
+                          setBulkSearch('');
+                        }}
+                      >
+                        <Text
+                          style={[styles.dropdownItemText, selected && { color: COLORS.white }]}
+                          numberOfLines={1}
+                        >
+                          {d.name}
+                        </Text>
+                        <Text style={[styles.dropdownCount, selected && { color: COLORS.white }]}>
+                          {countFor(d.id)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+            )}
+
+            <Text style={styles.label}>Excel file</Text>
+            <TouchableOpacity style={styles.pickFileBtn} onPress={pickFile} disabled={reading}>
+              <Text style={styles.pickFileText}>
+                {reading ? 'Binabasa...' : bulkFile ? `📄 ${bulkFile} (palitan)` : '📂 Pumili ng Excel file'}
+              </Text>
+            </TouchableOpacity>
+
+            {bulkFile !== '' && !reading && (
+              <View style={styles.previewBox}>
+                <Text style={styles.previewTitle}>
+                  {bulkRows.length} valid na tanong
+                  {bulkErrors.length > 0 ? ` · ${bulkErrors.length} may mali` : ''}
+                </Text>
+
+                {bulkRows.slice(0, 3).map((r, i) => (
+                  <Text key={i} style={styles.previewRow} numberOfLines={2}>
+                    {i + 1}. {r.question} ({r.correct_answer})
+                  </Text>
+                ))}
+                {bulkRows.length > 3 && (
+                  <Text style={styles.previewMore}>...at {bulkRows.length - 3} pa</Text>
+                )}
+
+                {bulkErrors.length > 0 && (
+                  <View style={{ marginTop: 10 }}>
+                    <Text style={styles.errTitle}>Hindi isasama (ayusin sa Excel kung gusto):</Text>
+                    {bulkErrors.slice(0, 8).map((e, i) => (
+                      <Text key={i} style={styles.errText}>• {e}</Text>
+                    ))}
+                    {bulkErrors.length > 8 && (
+                      <Text style={styles.errText}>...at {bulkErrors.length - 8} pang error</Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={[styles.row, { marginTop: 24 }]}>
+              <TouchableOpacity
+                style={[styles.delBtn, { backgroundColor: COLORS.muted }]}
+                onPress={() => setBulkVisible(false)}
+                disabled={importing}
+              >
+                <Text style={styles.btnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.editBtn, (!bulkRows.length || !bulkDest) && { opacity: 0.5 }]}
+                onPress={importRows}
+                disabled={importing || !bulkRows.length || !bulkDest}
+              >
+                <Text style={styles.btnText}>
+                  {importing ? 'Ini-import...' : `Import ${bulkRows.length || ''}`}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -380,14 +643,23 @@ const styles = StyleSheet.create({
   content: { padding: 20, paddingBottom: 40 },
   heading: { fontFamily: SERIF, fontSize: 24, fontWeight: '700', color: COLORS.ink },
   sub: { fontSize: 13, color: COLORS.muted, marginTop: 4, marginBottom: 14 },
+  topRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   addBtn: {
     backgroundColor: COLORS.leaf,
     borderRadius: 12,
     paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 14
+    alignItems: 'center'
   },
   addText: { color: COLORS.white, fontWeight: '700', fontSize: 15 },
+  bulkBtn: {
+    borderWidth: 1.5,
+    borderColor: COLORS.taal,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: COLORS.white
+  },
+  bulkBtnText: { color: COLORS.taal, fontWeight: '700', fontSize: 15 },
   empty: { color: COLORS.muted, marginTop: 20 },
   card: {
     backgroundColor: COLORS.white,
@@ -466,5 +738,38 @@ const styles = StyleSheet.create({
   },
   dropdownItemActive: { backgroundColor: COLORS.taal },
   dropdownItemText: { flex: 1, color: COLORS.ink, fontSize: 14 },
-  dropdownCount: { color: COLORS.muted, fontSize: 12, fontWeight: '700', marginLeft: 8 }
+  dropdownCount: { color: COLORS.muted, fontSize: 12, fontWeight: '700', marginLeft: 8 },
+
+  // Bulk upload
+  formatBox: {
+    backgroundColor: COLORS.leafSoft,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12
+  },
+  formatTitle: { fontSize: 13, fontWeight: '700', color: COLORS.taal, marginBottom: 6 },
+  formatText: { fontSize: 13, lineHeight: 19, color: COLORS.ink },
+  pickFileBtn: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: COLORS.taal,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    backgroundColor: COLORS.white
+  },
+  pickFileText: { color: COLORS.taal, fontWeight: '700', fontSize: 14 },
+  previewBox: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12
+  },
+  previewTitle: { fontSize: 14, fontWeight: '700', color: COLORS.ink, marginBottom: 6 },
+  previewRow: { fontSize: 13, lineHeight: 19, color: COLORS.ink, paddingVertical: 2 },
+  previewMore: { fontSize: 12, color: COLORS.muted, marginTop: 2 },
+  errTitle: { fontSize: 13, fontWeight: '700', color: COLORS.vermilion, marginBottom: 4 },
+  errText: { fontSize: 12, lineHeight: 18, color: COLORS.vermilion }
 });
