@@ -67,6 +67,8 @@ export default function QuizManageScreen({ route, navigation }) {
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [destSearch, setDestSearch] = useState('');
 
   useEffect(() => {
     navigation.setOptions({ title: `Manage ${province}` });
@@ -116,7 +118,12 @@ export default function QuizManageScreen({ route, navigation }) {
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const openAdd = () => {
-    setForm({ ...EMPTY_FORM, destination_id: filterDest ?? destinations[0]?.id ?? null });
+    // Piliin agad ang unang destination na hindi pa puno (mas gusto ang kasalukuyang filter)
+    const filterOk = filterDest && countFor(filterDest) < 5 ? filterDest : null;
+    const firstOpen = destinations.find((d) => countFor(d.id) < 5)?.id ?? null;
+    setForm({ ...EMPTY_FORM, destination_id: filterOk ?? firstOpen });
+    setPickerOpen(false);
+    setDestSearch('');
     setModalVisible(true);
   };
 
@@ -131,6 +138,8 @@ export default function QuizManageScreen({ route, navigation }) {
       option_d: q.option_d || '',
       correct_answer: correctKeyOf(q) || 'A'
     });
+    setPickerOpen(false);
+    setDestSearch('');
     setModalVisible(true);
   };
 
@@ -141,7 +150,9 @@ export default function QuizManageScreen({ route, navigation }) {
       return Alert.alert('Punuin lahat ng fields');
     }
     // 5 questions lang bawat destination. Burahin ang check na ito kung ayaw ng limit.
-    if (!id && countFor(destination_id) >= 5) {
+    const orig = id ? questions.find((q) => q.id === id) : null;
+    const movingToNewDest = !id || orig?.destination_id !== destination_id;
+    if (movingToNewDest && countFor(destination_id) >= 5) {
       return Alert.alert('Puno na', 'May 5 questions na ang destination na ito.');
     }
 
@@ -261,19 +272,72 @@ export default function QuizManageScreen({ route, navigation }) {
             <Text style={styles.heading}>{form.id ? 'Edit Question' : 'Add Question'}</Text>
 
             <Text style={styles.label}>Destination</Text>
-            <View style={styles.chips}>
-              {destinations.map((d) => (
-                <TouchableOpacity
-                  key={d.id}
-                  style={[styles.chip, form.destination_id === d.id && styles.chipActive]}
-                  onPress={() => setField('destination_id', d.id)}
-                >
-                  <Text style={[styles.chipText, form.destination_id === d.id && { color: COLORS.white }]}>
-                    {d.name} ({countFor(d.id)}/5)
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <TouchableOpacity
+              style={styles.dropdown}
+              onPress={() => setPickerOpen((o) => !o)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.dropdownText} numberOfLines={1}>
+                {form.destination_id
+                  ? `${destName(form.destination_id)} (${countFor(form.destination_id)}/5)`
+                  : 'Pumili ng destination'}
+              </Text>
+              <Text style={styles.dropdownArrow}>{pickerOpen ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+
+            {pickerOpen && (
+              <View style={styles.dropdownList}>
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Maghanap ng destination..."
+                  placeholderTextColor={COLORS.muted}
+                  value={destSearch}
+                  onChangeText={setDestSearch}
+                />
+                <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                  {destinations
+                    .filter((d) => norm(d.name).includes(norm(destSearch)))
+                    .map((d) => {
+                      const count = countFor(d.id);
+                      const isCurrent = form.id && d.id === form.destination_id;
+                      const full = count >= 5 && !isCurrent;
+                      const selected = form.destination_id === d.id;
+                      return (
+                        <TouchableOpacity
+                          key={d.id}
+                          style={[styles.dropdownItem, selected && styles.dropdownItemActive]}
+                          disabled={full}
+                          onPress={() => {
+                            setField('destination_id', d.id);
+                            setPickerOpen(false);
+                            setDestSearch('');
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownItemText,
+                              full && { color: COLORS.muted, opacity: 0.5 },
+                              selected && { color: COLORS.white }
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {d.name}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.dropdownCount,
+                              selected && { color: COLORS.white },
+                              full && { opacity: 0.5 }
+                            ]}
+                          >
+                            {count}/5
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                </ScrollView>
+              </View>
+            )}
 
             <Text style={styles.label}>Question</Text>
             <TextInput
@@ -376,5 +440,47 @@ const styles = StyleSheet.create({
   },
   chipActive: { backgroundColor: COLORS.taal, borderColor: COLORS.taal },
   chipCorrect: { backgroundColor: COLORS.leaf, borderColor: COLORS.leaf },
-  chipText: { color: COLORS.ink, fontSize: 13 }
+  chipText: { color: COLORS.ink, fontSize: 13 },
+
+    chipText: { color: COLORS.ink, fontSize: 13 },
+  dropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 12
+  },
+  dropdownText: { flex: 1, color: COLORS.ink, fontSize: 14 },
+  dropdownArrow: { color: COLORS.muted, fontSize: 12, marginLeft: 8 },
+  dropdownList: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    marginTop: 6,
+    overflow: 'hidden'
+  },
+  searchInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    color: COLORS.ink
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.line
+  },
+  dropdownItemActive: { backgroundColor: COLORS.taal },
+  dropdownItemText: { flex: 1, color: COLORS.ink, fontSize: 14 },
+  dropdownCount: { color: COLORS.muted, fontSize: 12, fontWeight: '700', marginLeft: 8 }
 });
