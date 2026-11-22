@@ -118,10 +118,7 @@ export default function QuizManageScreen({ route, navigation }) {
   const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const openAdd = () => {
-    // Piliin agad ang unang destination na hindi pa puno (mas gusto ang kasalukuyang filter)
-    const filterOk = filterDest && countFor(filterDest) < 5 ? filterDest : null;
-    const firstOpen = destinations.find((d) => countFor(d.id) < 5)?.id ?? null;
-    setForm({ ...EMPTY_FORM, destination_id: filterOk ?? firstOpen });
+    setForm({ ...EMPTY_FORM, destination_id: filterDest ?? destinations[0]?.id ?? null });
     setPickerOpen(false);
     setDestSearch('');
     setModalVisible(true);
@@ -148,12 +145,6 @@ export default function QuizManageScreen({ route, navigation }) {
     if (!destination_id) return Alert.alert('Piliin muna ang destination');
     if (![question, option_a, option_b, option_c, option_d].every((v) => String(v).trim())) {
       return Alert.alert('Punuin lahat ng fields');
-    }
-    // 5 questions lang bawat destination. Burahin ang check na ito kung ayaw ng limit.
-    const orig = id ? questions.find((q) => q.id === id) : null;
-    const movingToNewDest = !id || orig?.destination_id !== destination_id;
-    if (movingToNewDest && countFor(destination_id) >= 5) {
-      return Alert.alert('Puno na', 'May 5 questions na ang destination na ito.');
     }
 
     const payload = {
@@ -289,7 +280,7 @@ export default function QuizManageScreen({ route, navigation }) {
             >
               <Text style={styles.dropdownText} numberOfLines={1}>
                 {form.destination_id
-                  ? `${destName(form.destination_id)} (${countFor(form.destination_id)}/5)`
+                  ? `${destName(form.destination_id)} (${countFor(form.destination_id)})`
                   : 'Pumili ng destination'}
               </Text>
               <Text style={styles.dropdownArrow}>{pickerOpen ? '▲' : '▼'}</Text>
@@ -308,43 +299,25 @@ export default function QuizManageScreen({ route, navigation }) {
                   .filter((d) => norm(d.name).includes(norm(destSearch)))
                   .map((d) => {
                     const count = countFor(d.id);
-                    const isCurrent = form.id && d.id === form.destination_id;
-                    const full = count >= 5 && !isCurrent;
                     const selected = form.destination_id === d.id;
                     return (
                       <TouchableOpacity
                         key={d.id}
                         style={[styles.dropdownItem, selected && styles.dropdownItemActive]}
                         onPress={() => {
-                          if (full) {
-                            return Alert.alert(
-                              'Puno na',
-                              `${d.name} ay may 5 questions na. Mag-delete muna ng isa para makapagdagdag.`
-                            );
-                          }
                           setField('destination_id', d.id);
                           setPickerOpen(false);
                           setDestSearch('');
                         }}
                       >
                         <Text
-                          style={[
-                            styles.dropdownItemText,
-                            full && { color: COLORS.muted },
-                            selected && { color: COLORS.white }
-                          ]}
+                          style={[styles.dropdownItemText, selected && { color: COLORS.white }]}
                           numberOfLines={1}
                         >
                           {d.name}
                         </Text>
-                        <Text
-                          style={[
-                            styles.dropdownCount,
-                            full && { color: COLORS.vermilion },
-                            selected && { color: COLORS.white }
-                          ]}
-                        >
-                          {full ? 'Puno' : `${count}/5`}
+                        <Text style={[styles.dropdownCount, selected && { color: COLORS.white }]}>
+                          {count}
                         </Text>
                       </TouchableOpacity>
                     );
