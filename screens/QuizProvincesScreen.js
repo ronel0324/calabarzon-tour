@@ -90,7 +90,7 @@ export default function QuizProvincesScreen({ navigation }) {
     setLoading(false);
   }, [user?.id]);
 
-  // Mag-refresh tuwing babalik sa screen (pagkatapos mag-quiz)
+  // Mag-refresh tuwing babalik sa screen (pagkatapos mag-quiz o mag-manage)
   useFocusEffect(
     useCallback(() => {
       load();
@@ -118,37 +118,48 @@ export default function QuizProvincesScreen({ navigation }) {
             const empty = s.total === 0;
 
             return (
-              <TouchableOpacity
-                key={p.key}
-                style={[styles.card, empty && !isAdmin && { opacity: 0.55 }]}
-                activeOpacity={0.85}
-                disabled={empty && !isAdmin}   
-                onPress={() => navigation.navigate('QuizPlay', { province: p.key })}
-                accessibilityRole="button"
-                accessibilityLabel={`${p.key} quiz`}
-              >
-                <View style={styles.medallion}>
-                  <Text style={styles.icon}>{p.icon}</Text>
-                </View>
-                <View style={styles.cardBody}>
-                  <Text style={styles.cardTitle}>{p.key}</Text>
-                  <Text style={styles.cardTagline}>{p.tagline}</Text>
-
-                  <View style={styles.barTrack}>
-                    <View style={[styles.barFill, { width: `${pct * 100}%` }]} />
+              <View key={p.key} style={styles.cardWrap}>
+                <TouchableOpacity
+                  style={[styles.card, { marginBottom: 0 }, empty && { opacity: 0.55 }]}
+                  activeOpacity={0.85}
+                  disabled={empty}
+                  onPress={() => navigation.navigate('QuizPlay', { province: p.key })}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${p.key} quiz`}
+                >
+                  <View style={styles.medallion}>
+                    <Text style={styles.icon}>{p.icon}</Text>
                   </View>
-                  <Text style={styles.cardMeta}>
-                    {empty
-                      ? 'No questions yet'
-                      : `${s.answered} / ${s.total} answered · ${s.correct} correct`}
-                  </Text>
-                </View>
-                {(!empty || isAdmin) && (
-                  <Text style={styles.action}>
-                    {empty ? 'Add' : done ? 'Done' : started ? 'Resume' : 'Start'}
-                  </Text>
+                  <View style={styles.cardBody}>
+                    <Text style={styles.cardTitle}>{p.key}</Text>
+                    <Text style={styles.cardTagline}>{p.tagline}</Text>
+
+                    <View style={styles.barTrack}>
+                      <View style={[styles.barFill, { width: `${pct * 100}%` }]} />
+                    </View>
+                    <Text style={styles.cardMeta}>
+                      {empty
+                        ? 'No questions yet'
+                        : `${s.answered} / ${s.total} answered · ${s.correct} correct`}
+                    </Text>
+                  </View>
+                  {!empty && (
+                    <Text style={styles.action}>{done ? 'Done' : started ? 'Resume' : 'Start'}</Text>
+                  )}
+                </TouchableOpacity>
+
+                {isAdmin && (
+                  <TouchableOpacity
+                    style={styles.manageBtn}
+                    activeOpacity={0.85}
+                    onPress={() => navigation.navigate('QuizManage', { province: p.key })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Manage ${p.key} questions`}
+                  >
+                    <Text style={styles.manageText}>⚙ Manage Questions · Add / Edit / Delete</Text>
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
+              </View>
             );
           })
         )}
@@ -163,6 +174,7 @@ const styles = StyleSheet.create({
   heading: { fontFamily: SERIF, fontSize: 26, fontWeight: '700', color: COLORS.ink },
   sub: { fontSize: 14, lineHeight: 20, color: COLORS.muted, marginTop: 6, marginBottom: 20 },
   error: { color: '#B8372F', marginTop: 20 },
+  cardWrap: { marginBottom: 12 },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -173,6 +185,15 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 12
   },
+  manageBtn: {
+    backgroundColor: COLORS.taal,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginTop: -2
+  },
+  manageText: { color: COLORS.white, fontSize: 13, fontWeight: '700' },
   medallion: {
     width: 52,
     height: 52,
