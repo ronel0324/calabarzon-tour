@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -49,6 +49,13 @@ export default function QuizProvincesScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
   const [error, setError] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase.from('profiles').select('role').eq('id', user.id).single()
+      .then(({ data }) => setIsAdmin(data?.role === 'admin'));
+  }, [user?.id]);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
@@ -113,9 +120,9 @@ export default function QuizProvincesScreen({ navigation }) {
             return (
               <TouchableOpacity
                 key={p.key}
-                style={[styles.card, empty && { opacity: 0.55 }]}
+                style={[styles.card, empty && !isAdmin && { opacity: 0.55 }]}
                 activeOpacity={0.85}
-                disabled={empty}
+                disabled={empty && !isAdmin}   
                 onPress={() => navigation.navigate('QuizPlay', { province: p.key })}
                 accessibilityRole="button"
                 accessibilityLabel={`${p.key} quiz`}
@@ -136,8 +143,10 @@ export default function QuizProvincesScreen({ navigation }) {
                       : `${s.answered} / ${s.total} answered · ${s.correct} correct`}
                   </Text>
                 </View>
-                {!empty && (
-                  <Text style={styles.action}>{done ? 'Done' : started ? 'Resume' : 'Start'}</Text>
+                {(!empty || isAdmin) && (
+                  <Text style={styles.action}>
+                    {empty ? 'Add' : done ? 'Done' : started ? 'Resume' : 'Start'}
+                  </Text>
                 )}
               </TouchableOpacity>
             );

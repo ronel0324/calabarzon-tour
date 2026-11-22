@@ -7,7 +7,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Platform
+  Platform,
+  Modal,
+  TextInput
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -57,6 +59,17 @@ const correctKeyOf = (q) => {
   return KEYS.find((k) => norm(optionText(q, k)) === norm(ca)) || null;
 };
 
+const EMPTY_FORM = {
+  id: null,
+  destination_id: null,
+  question: '',
+  option_a: '',
+  option_b: '',
+  option_c: '',
+  option_d: '',
+  correct_answer: 'A'
+};
+
 export default function QuizPlayScreen({ route, navigation }) {
   const { province } = route.params;
   const { user } = useAuth();
@@ -69,16 +82,38 @@ export default function QuizPlayScreen({ route, navigation }) {
   const [sessionAnswered, setSessionAnswered] = useState(0);
   const [sessionCorrect, setSessionCorrect] = useState(0);
 
+  // Admin states
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [destinations, setDestinations] = useState([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [adminSaving, setAdminSaving] = useState(false);
+
   useEffect(() => {
     navigation.setOptions({ title: `${province} Quiz` });
   }, [navigation, province]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => setIsAdmin(data?.role === 'admin'));
+    supabase
+      .from('destinations')
+      .select('id, name, province')
+      .ilike('province', province)
+      .then(({ data }) => setDestinations(data || []));
+  }, [user?.id, province]);
 
   const load = useCallback(async () => {
     const [qRes, aRes] = await Promise.all([
       supabase
         .from('quiz_questions')
         .select(
-          'id, question, option_a, option_b, option_c, option_d, correct_answer, destinations!inner(province)'
+          'id, destination_id, question, option_a, option_b, option_c, option_d, correct_answer, destinations!inner(province)'
         )
         .order('id', { ascending: true }),
       supabase
@@ -157,6 +192,154 @@ export default function QuizPlayScreen({ route, navigation }) {
   const goPrevious = () => setPos((p) => Math.max(0, p - 1));
   const goNext = () => setPos((p) => p + 1);
 
+  // ---------- ADMIN: Add / Edit / Delete ----------
+  const setField = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const countFor = (destId) => questions.filter((q) => q.destination_id === destId).length;
+
+  const openAdd = () => {
+    setForm({ ...EMPTY_FORM, destination_id: destinations[0]?.id ?? null });
+    setModalVisible(true);
+  };
+
+  const openEdit = () => {
+    if (!current) return;
+    setForm({
+      id: current.id,
+      destination_id: current.destination_id,
+      question: current.question,
+      option_a: current.option_a,
+      option_b: current.option_b,
+      option_c: current.option_c,
+      option_d: current.option_d,
+      correct_answer: correctKeyOf(current) || 'A'
+    });
+    setModalVisible(true);
+  };
+
+  const saveQuestion = async () => {
+    const { id, destination_id, question, option_a, option_b, option_c, option_d, correct_answer } = form;
+    if (!destination_id) return Alert.alert('Piliin muna ang destination');
+    if (![question, option_a, option_b, option_c, option_d].every((v) => String(v).trim())) {
+      return Alert.alert('Punuin lahat ng fields');
+    }
+    if (!id && countFor(destination_id) >= 5) {
+      return Alert.alert('Puno na', 'May 5 questions na ang destination na ito.');
+    }
+
+    const payload = {
+      destination_id,
+      question: question.trim(),
+      option_a: option_a.trim(),
+      option_b: option_b.trim(),
+      option_c: option_c.trim(),
+      option_d: option_d.trim(),
+      correct_answer
+    };
+
+    setAdminSaving(true);
+    const query = id
+      ? supabase.from('quiz_questions').update(payload).eq('id', id)
+      : supabase.from('quiz_questions').insert(payload);
+    const { data, error } = await query.select().single();
+    setAdminSaving(false);
+
+    if (error) return Alert.alert('Error', error.message);
+
+    setQuestions((qs) => (id ? qs.map((q) => (q.id === id ? { ...q, ...data } : q)) : [...qs, data]));
+    setModalVisible(false);
+  };
+
+  const confirmDelete = () => {
+    if (!current) return;
+    const target = current;
+    Alert.alert('Delete question?', target.question, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const { error } = await supabase.from('quiz_questions').delete().eq('id', target.id);
+          if (error) return Alert.alert('Error', error.message);
+          setQuestions((qs) => qs.filter((q) => q.id !== target.id));
+          setAnswers((prev) => {
+            const next = new Map(prev);
+            next.delete(target.id);
+            return next;
+          });
+        }
+      }
+    ]);
+  };
+
+  const adminModal = isAdmin ? (
+    <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <Text style={styles.formHeading}>{form.id ? 'Edit Question' : 'Add Question'}</Text>
+
+          <Text style={styles.label}>Destination</Text>
+          <View style={styles.chips}>
+            {destinations.map((d) => (
+              <TouchableOpacity
+                key={d.id}
+                style={[styles.chip, form.destination_id === d.id && styles.chipActive]}
+                onPress={() => setField('destination_id', d.id)}
+              >
+                <Text style={[styles.chipText, form.destination_id === d.id && { color: COLORS.white }]}>
+                  {d.name} ({countFor(d.id)}/5)
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Question</Text>
+          <TextInput
+            style={[styles.input, { height: 80 }]}
+            multiline
+            value={form.question}
+            onChangeText={(v) => setField('question', v)}
+          />
+
+          {['a', 'b', 'c', 'd'].map((l) => (
+            <View key={l}>
+              <Text style={styles.label}>Option {l.toUpperCase()}</Text>
+              <TextInput
+                style={styles.input}
+                value={form[`option_${l}`]}
+                onChangeText={(v) => setField(`option_${l}`, v)}
+              />
+            </View>
+          ))}
+
+          <Text style={styles.label}>Tamang sagot</Text>
+          <View style={styles.chips}>
+            {KEYS.map((k) => (
+              <TouchableOpacity
+                key={k}
+                style={[styles.chip, form.correct_answer === k && styles.chipCorrect]}
+                onPress={() => setField('correct_answer', k)}
+              >
+                <Text style={[styles.chipText, form.correct_answer === k && { color: COLORS.white }]}>{k}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={[styles.navRow, { marginTop: 24 }]}>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { marginRight: 10, paddingVertical: 14 }]}
+              onPress={() => setModalVisible(false)}
+            >
+              <Text style={styles.secondaryBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.nextBtn} onPress={saveQuestion} disabled={adminSaving}>
+              <Text style={styles.primaryBtnText}>{adminSaving ? 'Saving...' : 'Save'}</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  ) : null;
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
@@ -191,15 +374,23 @@ export default function QuizPlayScreen({ route, navigation }) {
               <Text style={styles.primaryBtnText}>Review my answers</Text>
             </TouchableOpacity>
           )}
+
+          {isAdmin && (
+            <TouchableOpacity style={styles.adminAddBtn} onPress={openAdd}>
+              <Text style={styles.primaryBtnText}>+ Add Question</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
-            style={noQuestions ? styles.primaryBtn : styles.secondaryBtnWide}
+            style={noQuestions && !isAdmin ? styles.primaryBtn : styles.secondaryBtnWide}
             onPress={() => navigation.goBack()}
           >
-            <Text style={noQuestions ? styles.primaryBtnText : styles.secondaryBtnText}>
+            <Text style={noQuestions && !isAdmin ? styles.primaryBtnText : styles.secondaryBtnText}>
               Back to provinces
             </Text>
           </TouchableOpacity>
         </View>
+        {adminModal}
       </SafeAreaView>
     );
   }
@@ -217,6 +408,23 @@ export default function QuizPlayScreen({ route, navigation }) {
         <View style={styles.barTrack}>
           <View style={[styles.barFill, { width: `${progress * 100}%` }]} />
         </View>
+
+        {isAdmin && (
+          <View style={styles.adminBar}>
+            <TouchableOpacity style={[styles.adminBtn, { backgroundColor: COLORS.leaf }]} onPress={openAdd}>
+              <Text style={styles.adminBtnText}>+ Add</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.adminBtn, { backgroundColor: COLORS.taal }]} onPress={openEdit}>
+              <Text style={styles.adminBtnText}>Edit</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.adminBtn, { backgroundColor: COLORS.vermilion }]}
+              onPress={confirmDelete}
+            >
+              <Text style={styles.adminBtnText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <Text style={styles.question}>{current.question}</Text>
 
@@ -291,6 +499,7 @@ export default function QuizPlayScreen({ route, navigation }) {
           )}
         </View>
       </ScrollView>
+      {adminModal}
     </SafeAreaView>
   );
 }
@@ -385,5 +594,41 @@ const styles = StyleSheet.create({
     marginTop: 12,
     textAlign: 'center'
   },
-  doneText: { fontSize: 14, lineHeight: 21, color: COLORS.muted, marginTop: 8, textAlign: 'center' }
+  doneText: { fontSize: 14, lineHeight: 21, color: COLORS.muted, marginTop: 8, textAlign: 'center' },
+
+  // Admin
+  adminBar: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  adminBtn: { flex: 1, borderRadius: 10, paddingVertical: 9, alignItems: 'center' },
+  adminBtnText: { color: COLORS.white, fontWeight: '700', fontSize: 13 },
+  adminAddBtn: {
+    backgroundColor: COLORS.leaf,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginTop: 12
+  },
+  formHeading: { fontFamily: SERIF, fontSize: 24, fontWeight: '700', color: COLORS.ink, marginBottom: 12 },
+  label: { fontSize: 13, fontWeight: '700', color: COLORS.ink, marginTop: 14, marginBottom: 6 },
+  input: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 10,
+    padding: 10,
+    color: COLORS.ink,
+    textAlignVertical: 'top'
+  },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: COLORS.white
+  },
+  chipActive: { backgroundColor: COLORS.taal, borderColor: COLORS.taal },
+  chipCorrect: { backgroundColor: COLORS.leaf, borderColor: COLORS.leaf },
+  chipText: { color: COLORS.ink, fontSize: 13 }
 });
