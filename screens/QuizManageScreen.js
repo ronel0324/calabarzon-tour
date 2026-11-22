@@ -167,12 +167,15 @@ export default function QuizManageScreen({ route, navigation }) {
     };
 
     setSaving(true);
-    const { error } = id
-      ? await supabase.from('quiz_questions').update(payload).eq('id', id)
-      : await supabase.from('quiz_questions').insert(payload);
+    const { data, error } = id
+      ? await supabase.from('quiz_questions').update(payload).eq('id', id).select()
+      : await supabase.from('quiz_questions').insert(payload).select();
     setSaving(false);
 
     if (error) return Alert.alert('Error', error.message);
+    if (!data || data.length === 0) {
+      return Alert.alert('Hindi na-save', 'Na-block ng database (RLS). I-check ang admin policies sa quiz_questions.');
+    }
     setModalVisible(false);
     load();
   };
@@ -184,8 +187,15 @@ export default function QuizManageScreen({ route, navigation }) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
-          const { error } = await supabase.from('quiz_questions').delete().eq('id', q.id);
+          const { data, error } = await supabase
+            .from('quiz_questions')
+            .delete()
+            .eq('id', q.id)
+            .select();
           if (error) return Alert.alert('Error', error.message);
+          if (!data || data.length === 0) {
+            return Alert.alert('Hindi na-delete', 'Na-block ng database (RLS). I-check ang admin policies.');
+          }
           load();
         }
       }
@@ -294,48 +304,51 @@ export default function QuizManageScreen({ route, navigation }) {
                   value={destSearch}
                   onChangeText={setDestSearch}
                 />
-                <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                  {destinations
-                    .filter((d) => norm(d.name).includes(norm(destSearch)))
-                    .map((d) => {
-                      const count = countFor(d.id);
-                      const isCurrent = form.id && d.id === form.destination_id;
-                      const full = count >= 5 && !isCurrent;
-                      const selected = form.destination_id === d.id;
-                      return (
-                        <TouchableOpacity
-                          key={d.id}
-                          style={[styles.dropdownItem, selected && styles.dropdownItemActive]}
-                          disabled={full}
-                          onPress={() => {
-                            setField('destination_id', d.id);
-                            setPickerOpen(false);
-                            setDestSearch('');
-                          }}
+                {destinations
+                  .filter((d) => norm(d.name).includes(norm(destSearch)))
+                  .map((d) => {
+                    const count = countFor(d.id);
+                    const isCurrent = form.id && d.id === form.destination_id;
+                    const full = count >= 5 && !isCurrent;
+                    const selected = form.destination_id === d.id;
+                    return (
+                      <TouchableOpacity
+                        key={d.id}
+                        style={[styles.dropdownItem, selected && styles.dropdownItemActive]}
+                        onPress={() => {
+                          if (full) {
+                            return Alert.alert(
+                              'Puno na',
+                              `${d.name} ay may 5 questions na. Mag-delete muna ng isa para makapagdagdag.`
+                            );
+                          }
+                          setField('destination_id', d.id);
+                          setPickerOpen(false);
+                          setDestSearch('');
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            full && { color: COLORS.muted },
+                            selected && { color: COLORS.white }
+                          ]}
+                          numberOfLines={1}
                         >
-                          <Text
-                            style={[
-                              styles.dropdownItemText,
-                              full && { color: COLORS.muted, opacity: 0.5 },
-                              selected && { color: COLORS.white }
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {d.name}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.dropdownCount,
-                              selected && { color: COLORS.white },
-                              full && { opacity: 0.5 }
-                            ]}
-                          >
-                            {count}/5
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                </ScrollView>
+                          {d.name}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.dropdownCount,
+                            full && { color: COLORS.vermilion },
+                            selected && { color: COLORS.white }
+                          ]}
+                        >
+                          {full ? 'Puno' : `${count}/5`}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
               </View>
             )}
 
@@ -441,8 +454,6 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: COLORS.taal, borderColor: COLORS.taal },
   chipCorrect: { backgroundColor: COLORS.leaf, borderColor: COLORS.leaf },
   chipText: { color: COLORS.ink, fontSize: 13 },
-
-    chipText: { color: COLORS.ink, fontSize: 13 },
   dropdown: {
     flexDirection: 'row',
     alignItems: 'center',
