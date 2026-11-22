@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -45,17 +45,10 @@ const PROVINCES = [
 const norm = (s) => String(s || '').trim().toLowerCase();
 
 export default function QuizProvincesScreen({ navigation }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({});
   const [error, setError] = useState(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    if (!user?.id) return;
-    supabase.from('profiles').select('role').eq('id', user.id).single()
-      .then(({ data }) => setIsAdmin(data?.role === 'admin'));
-  }, [user?.id]);
 
   const load = useCallback(async () => {
     if (!user?.id) return;
