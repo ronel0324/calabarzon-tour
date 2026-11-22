@@ -517,16 +517,16 @@ export default function QuizManageScreen({ route, navigation }) {
             <Text style={styles.heading}>Bulk Upload (Excel)</Text>
 
             <View style={styles.formatBox}>
-              <Text style={styles.formatTitle}>Format ng Excel</Text>
-              <Text style={styles.formatText}>A: Question</Text>
-              <Text style={styles.formatText}>B: Option A    C: Option B    D: Option C    E: Option D</Text>
-              <Text style={styles.formatText}>F: Answer key (A, B, C, D o mismong text ng sagot)</Text>
+              <Text style={styles.formatTitle}>Excel Format</Text>
+              <Text style={styles.formatText}>Column A: Question</Text>
+              <Text style={styles.formatText}>Column B: Option A    Column C: Option B    Column D: Option C    Column E: Option D</Text>
+              <Text style={styles.formatText}>Column F: Answer key (A, B, C, D or exact answer)</Text>
               <Text style={[styles.formatText, { marginTop: 6 }]}>
-                Isang row = isang tanong. Pwede ang header sa row 1 (nagsisimula sa "Question").
+                One row = one question. A header in row 1 is allowed (starting with "Question").
               </Text>
             </View>
 
-            <Text style={styles.label}>Destination (dito mapupunta lahat)</Text>
+            <Text style={styles.label}>Destination (all questions will go here)</Text>
             <TouchableOpacity
               style={styles.dropdown}
               onPress={() => setBulkPickerOpen((o) => !o)}
