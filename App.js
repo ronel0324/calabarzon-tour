@@ -23,6 +23,7 @@ import QuizProvincesScreen from './screens/QuizProvincesScreen';
 import QuizPlayScreen from './screens/QuizPlayScreen';
 import GuessGameScreen from './screens/GuessGameScreen';
 import LeaderboardScreen from './screens/LeaderboardScreen';
+import QuizManageScreen from './screens/QuizManageScreen';
 
 const Stack = createNativeStackNavigator();
 
