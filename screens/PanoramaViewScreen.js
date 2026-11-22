@@ -841,12 +841,12 @@ const PanoramaViewScreen = ({ route, navigation }) => {
                 disabled={uploading}
               >
                 <Text style={styles.controlButtonText}>
-                  {uploading ? 'Uploading...' : '📷 Pumili ng larawan'}
+                  {uploading ? 'Uploading...' : '📷 Choose Image'}
                 </Text>
               </TouchableOpacity>
               {Platform.OS === 'web' && (
                 <Text style={styles.fieldHint}>
-                  Puwede ring mag-Ctrl+V ng kinopyang larawan dito.
+                  You can also paste a copied image here with Ctrl+V.
                 </Text>
               )}
               {!!formImageUrl && (
