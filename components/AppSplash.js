@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Image, StyleSheet, View, useWindowDimensions } from 'react-native';
 
 const SPLASH = require('../assets/splash.jpg');
-const BG = '#0f4a28';
-const DEFAULT_RATIO = 9 / 16;
+const BG = '#0f4a28'; // dark green sa pinakailalim ng image
+const DEFAULT_RATIO = 9 / 16; // gagamitin kung hindi makuha ang tunay na sukat
 
+// Gumagana sa phone; sa web kulang ang resolveAssetSource kaya may fallback
 const getInitialRatio = () => {
   try {
     if (typeof Image.resolveAssetSource === 'function') {
@@ -23,27 +24,17 @@ export default function AppSplash() {
   const { width, height } = useWindowDimensions();
   const [ratio, setRatio] = useState(INITIAL_RATIO);
 
+  // Kapag nag-load ang image, kunin ang tunay na sukat (lalo na sa web)
   const handleLoad = (e) => {
     const s = e?.nativeEvent?.source;
     if (s && s.width && s.height) setRatio(s.width / s.height);
   };
 
-  // Buo ang poster: kasya sa lapad AT taas ng screen
   const imgWidth = Math.min(width, height * ratio);
   const imgHeight = imgWidth / ratio;
 
   return (
     <View style={styles.container}>
-      {/* Backdrop: puno ang screen, malabo, may green tint */}
-      <Image
-        source={SPLASH}
-        style={StyleSheet.absoluteFill}
-        resizeMode="cover"
-        blurRadius={20}
-      />
-      <View style={[StyleSheet.absoluteFill, styles.tint]} />
-
-      {/* Ang tunay na poster, buo at nasa gitna */}
       <Image
         source={SPLASH}
         style={{ width: imgWidth, height: imgHeight }}
@@ -59,7 +50,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: BG,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'flex-start',
   },
-  tint: { backgroundColor: 'rgba(15, 74, 40, 0.6)' }
 });
