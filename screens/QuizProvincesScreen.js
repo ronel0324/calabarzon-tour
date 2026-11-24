@@ -33,7 +33,6 @@ const SERIF = Platform.select({
   default: 'serif'
 });
 
-// Ayusin kung iba ang spelling ng province sa destinations.province mo
 const PROVINCES = [
   { key: 'Cavite', icon: '🏛️', tagline: 'Cradle of Philippine independence' },
   { key: 'Laguna', icon: '♨️', tagline: 'Hot springs, lakes, and Rizal\'s Calamba' },
@@ -83,7 +82,6 @@ export default function QuizProvincesScreen({ navigation }) {
     setLoading(false);
   }, [user?.id]);
 
-  // Mag-refresh tuwing babalik sa screen (pagkatapos mag-quiz o mag-manage)
   useFocusEffect(
     useCallback(() => {
       load();

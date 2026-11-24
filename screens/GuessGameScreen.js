@@ -13,7 +13,6 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SERIF } from '../theme';
-// Ayusin ang path na ito kung nasaan ang Supabase client mo
 import { supabase } from '../services/supabase';
 
 const MAX_ATTEMPTS = 5;
@@ -25,7 +24,6 @@ const STATUS_COLOR = { correct: GREEN, present: YELLOW, absent: GRAY };
 
 const KEY_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
 
-// Mga salitang hindi tatakpan sa hint (para may clue pa rin ang player)
 const COMMON_WORDS = new Set([
   'mount', 'lake', 'falls', 'fall', 'river', 'church', 'cathedral', 'basilica', 'shrine',
   'national', 'park', 'museum', 'beach', 'resort', 'parish', 'island', 'cave', 'caves',
@@ -35,7 +33,6 @@ const COMMON_WORDS = new Set([
 const normalize = (s) => String(s || '').toUpperCase().replace(/[^A-Z]/g, '');
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// Palitan ng ____ ang sagot at ang mga pangalang salita sa description
 function maskHint(description, name, answer) {
   let text = String(description || '').replace(/\s+/g, ' ').trim();
   const words = new Set([answer.toLowerCase()]);
@@ -48,7 +45,6 @@ function maskHint(description, name, answer) {
   words.forEach((w) => {
     text = text.replace(new RegExp(escapeRegex(w), 'gi'), '____');
   });
-  // Maikli lang ang hint: hanggang mga 260 letra, putol sa dulo ng pangungusap
   if (text.length > 260) {
     const cut = text.slice(0, 260);
     const lastStop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
@@ -57,7 +53,6 @@ function maskHint(description, name, answer) {
   return text;
 }
 
-// Wordle rules: green muna, tapos yellow ayon sa natitirang bilang ng letra
 function evaluate(guess, answer) {
   const n = answer.length;
   const result = Array(n).fill('absent');
@@ -86,9 +81,9 @@ export default function GuessGameScreen({ navigation }) {
   const [loadError, setLoadError] = useState('');
 
   const [round, setRound] = useState(null);
-  const [guesses, setGuesses] = useState([]); // { word, result }
+  const [guesses, setGuesses] = useState([]);
   const [current, setCurrent] = useState('');
-  const [status, setStatus] = useState('playing'); // 'playing' | 'won' | 'lost'
+  const [status, setStatus] = useState('playing');
   const [earned, setEarned] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -98,7 +93,7 @@ export default function GuessGameScreen({ navigation }) {
     if (!list || list.length === 0) return;
     let fresh = list.filter((d) => !playedRef.current.has(d.id));
     if (fresh.length === 0) {
-      playedRef.current = new Set(); // naubos na ang lahat, ulitin
+      playedRef.current = new Set();
       fresh = list;
     }
     const next = fresh[Math.floor(Math.random() * fresh.length)];
@@ -180,7 +175,6 @@ export default function GuessGameScreen({ navigation }) {
       setStatus('lost');
       saveScore(round, false, next.length);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [round, status, current, guesses]);
 
   const onKey = useCallback(
@@ -193,7 +187,6 @@ export default function GuessGameScreen({ navigation }) {
     [round, status, submit]
   );
 
-  // Pisikal na keyboard sa web
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const handler = (e) => {
@@ -239,7 +232,6 @@ export default function GuessGameScreen({ navigation }) {
 
   const keyWidth = Math.floor((Math.min(width, 520) - 16 - 3 * 10) / 10);
 
-  // Kulay ng bawat key ayon sa pinakamagandang resulta
   const keyState = {};
   const rank = { absent: 1, present: 2, correct: 3 };
   guesses.forEach((g) => {
@@ -309,7 +301,6 @@ export default function GuessGameScreen({ navigation }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.inner}>
-        {/* Larawan */}
         <View style={styles.imageWrap}>
           <Image source={{ uri: round.image }} style={styles.image} resizeMode="cover" />
           <View style={styles.attemptBadge}>
@@ -319,16 +310,13 @@ export default function GuessGameScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Hint */}
         <View style={styles.hintCard}>
           <Text style={styles.hintLabel}>Hint</Text>
           <Text style={styles.hintText}>{hint || 'No hint available for this place.'}</Text>
         </View>
 
-        {/* Boxes */}
         <View style={styles.board}>{Array.from({ length: MAX_ATTEMPTS }).map((_, r) => renderRow(r))}</View>
 
-        {/* Resulta */}
         {finished && (
           <View style={[styles.resultCard, { borderColor: status === 'won' ? GREEN : '#B8372F' }]}>
             <Text style={styles.resultTitle}>{status === 'won' ? 'You got it!' : 'Not this time'}</Text>
@@ -349,7 +337,6 @@ export default function GuessGameScreen({ navigation }) {
           </View>
         )}
 
-        {/* Keyboard */}
         {!finished && (
           <View style={styles.keyboard}>
             <View style={styles.keyRow}>{KEY_ROWS[0].split('').map((k) => renderKey(k, () => onKey(k)))}</View>

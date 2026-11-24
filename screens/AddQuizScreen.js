@@ -12,8 +12,6 @@ import { supabase } from '../services/supabase';
 
 const LETTERS = ['a', 'b', 'c', 'd'];
 
-// Binubuksan mula sa DestinationListScreen:
-// navigation.navigate('AddQuiz', { destinationId: item.id, destinationName: item.name })
 export default function AddQuizScreen({ route }) {
   const destinationId = route?.params?.destinationId;
   const destinationName = route?.params?.destinationName;
@@ -39,7 +37,7 @@ export default function AddQuizScreen({ route }) {
       option_b: options[1].trim(),
       option_c: options[2].trim(),
       option_d: options[3].trim(),
-      correct_answer: LETTERS[correctIndex] // 'a' | 'b' | 'c' | 'd'
+      correct_answer: LETTERS[correctIndex]
     });
     setSaving(false);
 

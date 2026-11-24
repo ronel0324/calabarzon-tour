@@ -20,15 +20,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SERIF } from '../theme';
-// Ayusin ang path na ito kung nasaan ang Supabase client mo
 import { supabase } from '../services/supabase';
 import MediaGrid from '../components/MediaGrid';
 import MediaViewer from '../components/MediaViewer';
 import { fetchUserMedia, deleteMedia } from '../services/media';
 import { decode } from 'base64-arraybuffer';
-// Tinanggal na ang expo-file-system: native-only ito at sumisira sa web
 
-// Dapat tugma sa PROVINCES ng QuizProvincesScreen at sa destinations.province
 const PROVINCES = ['Cavite', 'Laguna', 'Batangas', 'Rizal', 'Quezon'];
 const norm = (s) => String(s || '').trim().toLowerCase();
 
@@ -38,7 +35,6 @@ const boardName = (r) =>
   r.username?.trim() ? `@${r.username.trim()}` : r.full_name?.trim() || 'Player';
 const pctOf = (a, b) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '–');
 
-// Alert.alert ay hindi gumagana sa web, kaya gumamit ng window.alert doon
 const notify = (title, message) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}\n${message}`);
@@ -47,19 +43,15 @@ const notify = (title, message) => {
   }
 };
 
-// Kunin ang bytes, content type, at extension ng napiling larawan.
-// Gumagana sa web at native, walang FileSystem.
 const getImageData = async (asset) => {
   const contentType = asset.mimeType || 'image/jpeg';
   const ext = contentType.split('/')[1]?.replace('jpeg', 'jpg') || 'jpg';
 
   let buffer;
   if (asset.base64) {
-    // Sa web, minsan may "data:image/...;base64," na prefix
     const raw = asset.base64.includes(',') ? asset.base64.split(',')[1] : asset.base64;
     buffer = decode(raw);
   } else if (Platform.OS === 'web' && asset.uri) {
-    // Fallback sa web: basahin mula sa uri
     const res = await fetch(asset.uri);
     buffer = await res.arrayBuffer();
   } else {
@@ -84,9 +76,9 @@ export default function ProfileScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const viewerSize = Math.min(screenWidth - 32, 420);
   const [form, setForm] = useState({ full_name: '', username: '', bio: '', address: '' });
-  const [editMode, setEditMode] = useState('all'); // 'all' | 'bio'
+  const [editMode, setEditMode] = useState('all');
   const [myMedia, setMyMedia] = useState([]);
-  const [tab, setTab] = useState('quiz'); // 'quiz' | 'media' | 'board'
+  const [tab, setTab] = useState('quiz');
   const [board, setBoard] = useState([]);
   const [mediaViewer, setMediaViewer] = useState(null);
 
@@ -140,7 +132,6 @@ export default function ProfileScreen() {
     setLoading(false);
   }, [user?.id]);
 
-  // I-refresh tuwing mapupunta ang screen na ito (halimbawa pagkatapos mag-quiz)
   useFocusEffect(
     useCallback(() => {
       load();
@@ -153,7 +144,6 @@ export default function ProfileScreen() {
   const mainName = fullName || (username ? `@${username}` : fallbackName);
   const initial = mainName.replace('@', '').charAt(0).toUpperCase();
 
-  // Stats mula sa quiz_answers
   const totalQuestions = provinceStats.reduce((n, s) => n + s.total, 0);
   const totalAnswered = provinceStats.reduce((n, s) => n + s.answered, 0);
   const totalCorrect = provinceStats.reduce((n, s) => n + s.correct, 0);
@@ -219,7 +209,6 @@ export default function ProfileScreen() {
   };
 
   const pickAvatar = async () => {
-    // Sa web, hindi kailangan ang permission request
     if (Platform.OS !== 'web') {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -242,7 +231,6 @@ export default function ProfileScreen() {
       const asset = result.assets[0];
       const { buffer, contentType, ext } = await getImageData(asset);
 
-      // Bagong filename bawat upload para hindi ma-cache ang lumang larawan
       const path = `${user.id}/avatar-${Date.now()}.${ext}`;
       const { error: uploadError } = await supabase.storage
         .from('avatars')
@@ -262,7 +250,6 @@ export default function ProfileScreen() {
         );
       }
 
-      // Burahin ang lumang larawan (hindi mahalaga kung mabigo)
       const oldUrl = profile?.avatar_url;
       if (oldUrl && oldUrl.includes('/avatars/')) {
         const oldPath = oldUrl.split('/avatars/')[1];
@@ -278,7 +265,6 @@ export default function ProfileScreen() {
   };
 
   const pickBanner = async () => {
-    // Sa web, hindi kailangan ang permission request
     if (Platform.OS !== 'web') {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -318,7 +304,6 @@ export default function ProfileScreen() {
         throw new Error('The banner uploaded, but your profile was not updated.');
       }
 
-      // Burahin ang lumang banner (hindi mahalaga kung mabigo)
       const oldUrl = profile?.banner_url;
       if (oldUrl && oldUrl.includes('/avatars/')) {
         const oldPath = oldUrl.split('/avatars/')[1];
@@ -386,7 +371,6 @@ export default function ProfileScreen() {
   return (
     <View style={styles.screen}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Banner */}
         <View style={styles.banner}>
           <Image
             source={
@@ -405,7 +389,6 @@ export default function ProfileScreen() {
             </View>
           )}
 
-          {/* Kanang ibaba: camera (palitan ang banner) */}
           <View style={styles.bannerActions}>
             <TouchableOpacity
               style={styles.bannerIconBtn}
@@ -419,10 +402,8 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Avatar */}
         <View style={styles.avatarWrap}>
           <View style={styles.avatarHolder}>
-            {/* Pindutin ang avatar para tingnan */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => (profile?.avatar_url ? setViewerVisible(true) : pickAvatar())}
@@ -444,7 +425,6 @@ export default function ProfileScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Maliit na camera button para magpalit */}
             <TouchableOpacity
               style={styles.avatarBadge}
               onPress={pickAvatar}
@@ -458,7 +438,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Name, username, address, bio */}
         <View style={styles.identity}>
           <Text style={styles.name}>{mainName}</Text>
           {fullName && username ? <Text style={styles.username}>@{username}</Text> : null}
@@ -496,7 +475,6 @@ export default function ProfileScreen() {
 
         <View style={styles.goldRule} />
 
-        {/* Tabs: Quiz progress | Media | Leaderboard */}
         <View style={styles.tabBar}>
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'quiz' && styles.tabBtnActive]}
@@ -635,7 +613,6 @@ export default function ProfileScreen() {
         )}
       </ScrollView>
 
-      {/* View avatar */}
       <Modal
         visible={viewerVisible}
         transparent
@@ -655,7 +632,6 @@ export default function ProfileScreen() {
         </Pressable>
       </Modal>
 
-      {/* Edit profile */}
       <Modal
         visible={editVisible}
         transparent
@@ -754,7 +730,6 @@ const styles = StyleSheet.create({
     paddingBottom: 40
   },
 
-  // Banner
   banner: {
     height: 160,
     backgroundColor: COLORS.taal,
@@ -791,11 +766,9 @@ const styles = StyleSheet.create({
     marginLeft: 8
   },
 
-  // Avatar
   avatarWrap: {
     alignItems: 'center',
     marginTop: -(AVATAR / 2),
-    // Para hindi harangan ng wrapper ang camera button sa banner (web)
     pointerEvents: 'box-none'
   },
   avatar: {
@@ -864,7 +837,6 @@ const styles = StyleSheet.create({
     marginTop: 6
   },
 
-  // Identity
   identity: {
     alignItems: 'center',
     paddingHorizontal: 28,
@@ -938,7 +910,6 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
 
-  // Tabs
   tabBar: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -959,7 +930,6 @@ const styles = StyleSheet.create({
     paddingTop: 2
   },
 
-  // Quiz progress
   section: {
     paddingHorizontal: 20,
     paddingTop: 14
@@ -1056,7 +1026,7 @@ const styles = StyleSheet.create({
     fontSize: 13
   },
 
-  // Leaderboard
+
   boardCaption: {
     fontSize: 13,
     lineHeight: 19,
@@ -1116,7 +1086,6 @@ const styles = StyleSheet.create({
     color: COLORS.muted
   },
 
-  // Modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

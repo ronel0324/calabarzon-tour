@@ -34,10 +34,9 @@ const CATEGORIES = [
   'Other'
 ];
 
-const DEFAULT_LAT = 14.1008; // CALABARZON center
+const DEFAULT_LAT = 14.1008;
 const DEFAULT_LNG = 121.0794;
 
-// Alert.alert ay hindi gumagana sa web, kaya window.alert doon
 const notify = (title, message, onOk) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}\n\n${message}`);
@@ -143,7 +142,6 @@ export default function EditDestinationScreen({ route, navigation }) {
     }
   };
 
-  // Kapareho ng Add screen: gamit ang pickPanoramaImage
   const handlePickPanorama = async () => {
     const uri = await pickPanoramaImage();
     if (uri) setPanoramaUri(uri);
@@ -171,14 +169,11 @@ export default function EditDestinationScreen({ route, navigation }) {
 
     setSaving(true);
     try {
-      // Kung bagong larawan galing sa picker, ina-upload ito ng database.js sa Supabase
       await updateDestination(destinationId, {
         ...formData,
         category: formData.categories.join(', ')
       });
 
-      // Kapareho ng Add screen: ang 360 ay sine-save bilang panorama point.
-      // Kung may entry point na, i-update ang larawan niya; kung wala pa, mag-add.
       let panoMsg = '';
       console.log('360 selected?', panoramaUri);
       if (panoramaUri) {
@@ -267,7 +262,6 @@ export default function EditDestinationScreen({ route, navigation }) {
             onChangeText={(text) => handleInputChange('address', text)}
           />
 
-          {/* Mapa sa phone, lat/long input sa web (kapareho ng Add screen) */}
           {loaded && (
             <LocationPicker
               latitude={formData.latitude ?? DEFAULT_LAT}
@@ -328,7 +322,6 @@ export default function EditDestinationScreen({ route, navigation }) {
             onChangeText={(text) => handleInputChange('image', text)}
           />
 
-          {/* ===== 360° Image ===== */}
           <Text style={styles.label}>360° Image (optional)</Text>
           <Text style={styles.helperText}>
             The ratio must be 2:1 (e.g., 4096×2048), coming from a 360 camera or Photo Sphere. The upload limit is up to 50 MB.

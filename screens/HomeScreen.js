@@ -18,12 +18,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-// Ayusin ang path na ito kung nasaan ang Supabase client mo
+
 import { supabase } from '../services/supabase';
 
-// Palette: hango sa Taal Lake, sa ginto ng araw sa watawat, at sa kulay ng Pahiyas
+
 const COLORS = {
-  taal: '#0E3B43', // malalim na teal ng lawa
+  taal: '#0E3B43',
   taalSoft: '#1D5963',
   paper: '#F5F6F1',
   white: '#FFFFFF',
@@ -37,7 +37,6 @@ const COLORS = {
   line: '#E1E3DA'
 };
 
-// Serif para sa mga pamagat (heritage na dating), system font para sa maliliit na teksto
 const SERIF = Platform.select({
   ios: 'Georgia',
   android: 'serif',
@@ -51,7 +50,7 @@ const DEFAULT_BANNER = {
   subtitle: 'Five provinces of heritage, history, and landscape'
 };
 
-// Alert.alert ay hindi gumagana sa web, kaya gumamit ng window.alert doon
+
 const notify = (title, message) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}\n${message}`);
@@ -60,7 +59,6 @@ const notify = (title, message) => {
   }
 };
 
-// Confirm bago magbura (Alert.alert ay hindi gumagana sa web)
 const confirmAction = (title, message, onConfirm) => {
   if (Platform.OS === 'web') {
     if (window.confirm(`${title}\n${message}`)) onConfirm();
@@ -104,7 +102,6 @@ const MENU_ITEMS = [
   }
 ];
 
-// Hinabing banig na border: hilera ng maliliit na diamond, ang tanging palamuti ng screen
 const WeaveBand = () => {
   const { width } = useWindowDimensions();
   const cell = 14;
@@ -131,18 +128,18 @@ export default function HomeScreen({ navigation }) {
 
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
-  // Banner (editable ng admin)
+
   const [banner, setBanner] = useState(DEFAULT_BANNER);
   const [editVisible, setEditVisible] = useState(false);
   const [draft, setDraft] = useState(DEFAULT_BANNER);
 
-  // Profile
+
   const [profile, setProfile] = useState(null);
   const [menuVisible, setMenuVisible] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
 
-  // Settings (palitan ang password)
+
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [pw, setPw] = useState({ current: '', next: '', confirm: '' });
   const [pwSaving, setPwSaving] = useState(false);
@@ -151,7 +148,6 @@ export default function HomeScreen({ navigation }) {
   const displayName = profile?.full_name || user?.email?.split('@')[0] || 'User';
   const initial = displayName.charAt(0).toUpperCase();
 
-  // I-load ang banner: cache muna, tapos pinakabago mula sa Supabase
   useEffect(() => {
     (async () => {
       try {
@@ -173,7 +169,6 @@ export default function HomeScreen({ navigation }) {
     })();
   }, []);
 
-  // I-load ang profile ng user mula sa Supabase
   useEffect(() => {
     if (!user?.id) return;
     const load = async () => {
@@ -252,7 +247,6 @@ export default function HomeScreen({ navigation }) {
 
     setPwSaving(true);
 
-    // I-verify muna ang current password
     const { error: verifyError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: pw.current
@@ -302,7 +296,6 @@ export default function HomeScreen({ navigation }) {
     setProfileVisible(false);
   };
 
-  // Header: title + edit icon (admin lang) sa gitna, avatar sa kanan
   useEffect(() => {
     navigation.setOptions({
       title: banner.title,
@@ -349,7 +342,6 @@ export default function HomeScreen({ navigation }) {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
         <View style={styles.hero}>
           <Image
             source={require('../assets/calabarzon.png')}
@@ -369,7 +361,6 @@ export default function HomeScreen({ navigation }) {
             Explore the rich cultural heritage and tourist destinations of Region IV-A.
           </Text>
 
-          {/* Featured: Map */}
           <TouchableOpacity
             style={styles.featured}
             activeOpacity={0.88}
@@ -388,7 +379,6 @@ export default function HomeScreen({ navigation }) {
             </View>
           </TouchableOpacity>
 
-          {/* Menu list */}
           <Text style={styles.sectionTitle}>Explore</Text>
           <View style={styles.menuList}>
             {visibleMenu.map((item, index) => (
@@ -414,7 +404,6 @@ export default function HomeScreen({ navigation }) {
         </View>
 
         <View style={styles.content}>
-          {/* About */}
           <View style={styles.about}>
             <Text style={styles.aboutTitle}>About CALABARZON</Text>
             <View style={styles.goldRule} />
@@ -458,7 +447,6 @@ export default function HomeScreen({ navigation }) {
         <WeaveBand />
       </ScrollView>
 
-      {/* Edit banner (admin) */}
       <Modal
         visible={editVisible}
         transparent
@@ -498,7 +486,6 @@ export default function HomeScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* Dropdown ng avatar */}
       <Modal
         visible={menuVisible}
         transparent
@@ -533,7 +520,6 @@ export default function HomeScreen({ navigation }) {
         </Pressable>
       </Modal>
 
-      {/* Edit profile */}
       <Modal
         visible={profileVisible}
         transparent
@@ -568,7 +554,6 @@ export default function HomeScreen({ navigation }) {
         </View>
       </Modal>
 
-      {/* Settings: change password */}
       <Modal
         visible={settingsVisible}
         transparent
@@ -659,7 +644,7 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.taal // tugma sa hero at sa status bar
+    backgroundColor: COLORS.taal
   },
   container: {
     flex: 1,
@@ -670,7 +655,6 @@ const styles = StyleSheet.create({
     paddingBottom: 0
   },
 
-  // Header
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center'
@@ -705,7 +689,6 @@ const styles = StyleSheet.create({
     fontSize: 16
   },
 
-  // Hero
   hero: {
     height: 280,
     backgroundColor: COLORS.taal
@@ -742,7 +725,6 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
 
-  // Weave band
   weaveBand: {
     flexDirection: 'row',
     height: 18,
@@ -776,7 +758,6 @@ const styles = StyleSheet.create({
     marginBottom: 22
   },
 
-  // Featured map card
   featured: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -823,7 +804,6 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
 
-  // Menu list
   menuList: {
     backgroundColor: COLORS.white,
     borderRadius: 14,
@@ -873,7 +853,6 @@ const styles = StyleSheet.create({
     marginLeft: 8
   },
 
-  // About
   about: {
     marginTop: 18,
     marginBottom: 30
@@ -907,7 +886,6 @@ const styles = StyleSheet.create({
     color: COLORS.goldDeep
   },
 
-  // Dropdown ng avatar
   ddBackdrop: {
     flex: 1
   },
@@ -955,7 +933,6 @@ const styles = StyleSheet.create({
     color: COLORS.ink
   },
 
-  // Modals
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -978,7 +955,6 @@ const styles = StyleSheet.create({
   modalBtn: { paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, marginLeft: 8 },
   modalBtnPrimary: { backgroundColor: COLORS.taal },
 
-  // Settings
   settingsSection: {
     fontSize: 15,
     fontWeight: '700',

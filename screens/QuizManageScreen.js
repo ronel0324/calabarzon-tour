@@ -41,7 +41,6 @@ const KEYS = ['A', 'B', 'C', 'D'];
 const norm = (s) => String(s || '').trim().toLowerCase();
 const optionText = (q, key) => q[`option_${key.toLowerCase()}`];
 
-// Gumagana sa web at sa phone
 const showAlert = (title, message) => {
   if (Platform.OS === 'web') {
     window.alert(message ? `${title}\n\n${message}` : title);
@@ -67,7 +66,6 @@ const confirmAsync = (title, message) =>
 
 const errText = (error) => `${error.message}\n${error.details || ''}\n${error.code || ''}`;
 
-// Suportado ang correct_answer na letter ("B") o mismong text ng sagot
 const correctKeyOf = (q) => {
   const ca = String(q.correct_answer || '').trim();
   if (/^[a-d]$/i.test(ca)) return ca.toUpperCase();
@@ -85,15 +83,14 @@ const EMPTY_FORM = {
   correct_answer: 'A'
 };
 
-// Binabasa ang rows mula sa Excel: A=Question, B-E=Options A-D, F=Answer key
 const parseRows = (rows) => {
   const valid = [];
   const errors = [];
 
   rows.forEach((r, i) => {
     const cells = [0, 1, 2, 3, 4, 5].map((c) => String(r?.[c] ?? '').trim());
-    if (cells.every((c) => !c)) return; // blangkong row
-    if (i === 0 && /^question/i.test(cells[0])) return; // header row
+    if (cells.every((c) => !c)) return; 
+    if (i === 0 && /^question/i.test(cells[0])) return;
 
     const [question, a, b, c, d, ans] = cells;
     const rowNo = i + 1;
@@ -134,14 +131,13 @@ export default function QuizManageScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [destinations, setDestinations] = useState([]);
   const [questions, setQuestions] = useState([]);
-  const [filterDest, setFilterDest] = useState(null); // null = lahat
+  const [filterDest, setFilterDest] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [destSearch, setDestSearch] = useState('');
 
-  // Bulk upload states
   const [bulkVisible, setBulkVisible] = useState(false);
   const [bulkDest, setBulkDest] = useState(null);
   const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
@@ -196,7 +192,6 @@ export default function QuizManageScreen({ route, navigation }) {
     }, [load])
   );
 
-  // Realtime: mag-a-update agad kapag may insert/update/delete (may debounce)
   useEffect(() => {
     let timer;
     const channel = supabase
@@ -294,7 +289,6 @@ export default function QuizManageScreen({ route, navigation }) {
     load(true);
   };
 
-  // ---------- BULK UPLOAD ----------
   const openBulk = () => {
     setBulkDest(filterDest ?? destinations[0]?.id ?? null);
     setBulkPickerOpen(false);
@@ -309,8 +303,8 @@ export default function QuizManageScreen({ route, navigation }) {
     try {
       const res = await DocumentPicker.getDocumentAsync({
         type: [
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-          'application/vnd.ms-excel', // .xls
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.ms-excel',
           'text/csv',
           'text/comma-separated-values'
         ],
@@ -347,7 +341,6 @@ export default function QuizManageScreen({ route, navigation }) {
     setImporting(true);
     const payload = bulkRows.map((r) => ({ ...r, destination_id: bulkDest }));
 
-    // Hatiin sa 100 bawat insert
     for (let i = 0; i < payload.length; i += 100) {
       const chunk = payload.slice(i, i + 100);
       const { data, error } = await supabase.from('quiz_questions').insert(chunk).select();
@@ -449,7 +442,6 @@ export default function QuizManageScreen({ route, navigation }) {
         )}
       </ScrollView>
 
-      {/* ADD / EDIT MODAL */}
       <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -555,7 +547,6 @@ export default function QuizManageScreen({ route, navigation }) {
         </SafeAreaView>
       </Modal>
 
-      {/* BULK UPLOAD MODAL */}
       <Modal visible={bulkVisible} animationType="slide" onRequestClose={() => setBulkVisible(false)}>
         <SafeAreaView style={styles.safeArea}>
           <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -785,7 +776,6 @@ const styles = StyleSheet.create({
   dropdownItemText: { flex: 1, color: COLORS.ink, fontSize: 14 },
   dropdownCount: { color: COLORS.muted, fontSize: 12, fontWeight: '700', marginLeft: 8 },
 
-  // Bulk upload
   formatBox: {
     backgroundColor: COLORS.leafSoft,
     borderRadius: 12,

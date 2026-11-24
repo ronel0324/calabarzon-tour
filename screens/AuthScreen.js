@@ -8,14 +8,13 @@ import { COLORS, SERIF } from '../theme';
 
 export default function AuthScreen() {
   const { signIn, signUp } = useAuth();
-  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
 
-  // Alert.alert ay hindi gumagana sa web, kaya ipakita ang mensahe sa mismong form
   const notify = (title, text) => {
     if (Platform.OS === 'web') setMessage(`${title}: ${text}`);
     else Alert.alert(title, text);

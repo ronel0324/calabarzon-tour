@@ -37,11 +37,8 @@ const CATEGORIES = [
   'Other'
 ];
 
-// NEW: CALABARZON provinces para sa dropdown
 const PROVINCES = ['All Provinces', 'Batangas', 'Cavite', 'Laguna', 'Quezon', 'Rizal'];
 
-// NEW: Kukunin ang province mula sa item.province kung meron.
-// Kung wala, hahanapin sa address (hal. "Tanay, Rizal").
 const getProvince = (item) => {
   if (item.province) return item.province;
   const addr = (item.address || '').toLowerCase();
@@ -52,8 +49,8 @@ export default function DestinationListScreen({ navigation }) {
   const [destinations, setDestinations] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedProvince, setSelectedProvince] = useState('All Provinces'); // NEW
-  const [openDropdown, setOpenDropdown] = useState(null); // NEW: null | 'category' | 'province'
+  const [selectedProvince, setSelectedProvince] = useState('All Provinces');
+  const [openDropdown, setOpenDropdown] = useState(null);
   const { isAdmin } = useAuth();
 
   const loadDestinations = async () => {
@@ -66,8 +63,6 @@ export default function DestinationListScreen({ navigation }) {
       } else {
         results = await getAllDestinations();
       }
-
-      // NEW: province filter (gumagana kasabay ng search at category)
       if (selectedProvince !== 'All Provinces') {
         results = results.filter((item) => getProvince(item) === selectedProvince);
       }
@@ -82,14 +77,12 @@ export default function DestinationListScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       loadDestinations();
-    }, [searchQuery, selectedCategory, selectedProvince]) // NEW: selectedProvince
+    }, [searchQuery, selectedCategory, selectedProvince])
   );
 
-    // Laging nakaturo sa pinakabagong loadDestinations (kasama ang kasalukuyang filters)
   const loadRef = useRef(loadDestinations);
   loadRef.current = loadDestinations;
 
-  // Realtime: mag-refresh ang listahan kapag may nagbago sa destinations
   useFocusEffect(
     useCallback(() => {
       let timer;
@@ -99,7 +92,6 @@ export default function DestinationListScreen({ navigation }) {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'destinations' },
           () => {
-            // Maikling antala para hindi sunod-sunod ang reload
             clearTimeout(timer);
             timer = setTimeout(() => loadRef.current(), 300);
           }
@@ -119,15 +111,13 @@ export default function DestinationListScreen({ navigation }) {
 
   const handleCategoryFilter = (category) => {
     setSelectedCategory(category);
-    setSearchQuery(''); // Clear search when filtering by category
+    setSearchQuery('');
   };
 
-  // NEW: pagpili ng province mula sa dropdown
   const handleProvinceSelect = (province) => {
     setSelectedProvince(province);
   };
 
-  // NEW: iisang modal para sa category at province
   const dropdownOptions = openDropdown === 'category' ? CATEGORIES : PROVINCES;
   const dropdownSelected = openDropdown === 'category' ? selectedCategory : selectedProvince;
 
@@ -140,7 +130,6 @@ export default function DestinationListScreen({ navigation }) {
     setOpenDropdown(null);
   };
 
-  // Hiwalay na function para sa actual na pagbura
   const performDelete = async (id) => {
     if (!isAdmin) return;
     try {
@@ -166,8 +155,6 @@ export default function DestinationListScreen({ navigation }) {
   const handleDelete = (id, name) => {
     console.log('Delete pressed:', id, name);
 
-    // FIX: Alert.alert na may buttons ay HINDI gumagana sa Expo Web,
-    // kaya gumamit ng window.confirm doon.
     if (Platform.OS === 'web') {
       if (window.confirm(`Are you sure you want to delete "${name}"?`)) {
         performDelete(id);
@@ -189,8 +176,6 @@ export default function DestinationListScreen({ navigation }) {
     );
   };
 
-  // FIX: Hindi na nested ang buttons sa loob ng TouchableOpacity.
-  // Ang card ay View na; ang info area lang ang pinipindot para mag-navigate.
   const renderDestinationItem = ({ item }) => (
     <View style={styles.card}>
       <TouchableOpacity
@@ -249,7 +234,6 @@ export default function DestinationListScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Search Bar */}
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -259,7 +243,6 @@ export default function DestinationListScreen({ navigation }) {
           />
         </View>
 
-        {/* NEW: Dalawang dropdown button — Categories at Province */}
         <View style={dropdownStyles.row}>
           <TouchableOpacity
             style={[styles.filterButton, categoryActive && styles.filterButtonActive]}
@@ -284,7 +267,6 @@ export default function DestinationListScreen({ navigation }) {
           </TouchableOpacity>
         </View>
 
-        {/* NEW: Modal na ginagamit ng dalawang dropdown */}
         <Modal
           visible={openDropdown !== null}
           transparent
@@ -325,14 +307,12 @@ export default function DestinationListScreen({ navigation }) {
           </TouchableOpacity>
         </Modal>
 
-        {/* Results Count */}
         <View style={styles.resultsContainer}>
           <Text style={styles.resultsText}>
             {destinations.length} {destinations.length === 1 ? 'destination' : 'destinations'} found
           </Text>
         </View>
 
-        {/* Destination List */}
         {destinations.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No destinations found</Text>
@@ -359,7 +339,6 @@ export default function DestinationListScreen({ navigation }) {
   );
 }
 
-// NEW: styles para sa dropdown row at modal (hiwalay sa listStyles)
 const dropdownStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',

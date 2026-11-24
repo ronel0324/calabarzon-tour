@@ -22,13 +22,13 @@ import styles from '../styles/detailStyles';
 export default function DestinationDetailScreen({ route, navigation }) {
   const { destinationId } = route.params;
   const [destination, setDestination] = useState(null);
-  const [quizQuestions, setQuizQuestions] = useState([]); // lahat ng tanong ng destination
-  const [answerStats, setAnswerStats] = useState({ answered: 0, correct: 0 }); // galing quiz_answers
-  const [quizQueue, setQuizQueue] = useState([]); // mga hindi pa nasasagutan (ito ang lalabas sa quiz)
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [answerStats, setAnswerStats] = useState({ answered: 0, correct: 0 });
+  const [quizQueue, setQuizQueue] = useState([]);
   const [showQuiz, setShowQuiz] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
-  const [score, setScore] = useState(0); // tama sa kasalukuyang round
+  const [score, setScore] = useState(0);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [hasPanorama, setHasPanorama] = useState(false);
@@ -59,15 +59,12 @@ export default function DestinationDetailScreen({ route, navigation }) {
     }
   };
 
-    // Laging nakaturo sa pinakabagong loadDestinationData
   const loadRef = useRef(loadDestinationData);
   loadRef.current = loadDestinationData;
 
-  // Realtime: mag-refresh kapag may nagbago sa destination, quiz, o 360° view
   useEffect(() => {
     let timer;
     const refresh = () => {
-      // Maikling antala para hindi sunod-sunod ang reload
       clearTimeout(timer);
       timer = setTimeout(() => loadRef.current(), 300);
     };
@@ -88,7 +85,6 @@ export default function DestinationDetailScreen({ route, navigation }) {
         'postgres_changes',
         { event: 'DELETE', schema: 'public', table: 'destinations' },
         (payload) => {
-          // Nabura ang destination na tinitingnan: bumalik sa listahan
           if (String(payload.old.id) === String(destinationId)) {
             navigation.goBack();
           }
@@ -129,7 +125,6 @@ export default function DestinationDetailScreen({ route, navigation }) {
     }
 
     try {
-      // Mga tanong lang na hindi pa nasasagutan ang ilalabas (resume)
       const answers = await getQuizAnswersForQuestions(quizQuestions.map((q) => q.id));
       const answeredIds = new Set(answers.map((a) => a.question_id));
       const remaining = quizQuestions.filter((q) => !answeredIds.has(q.id));
@@ -165,7 +160,6 @@ export default function DestinationDetailScreen({ route, navigation }) {
     const currentQuestion = quizQueue[currentQuestionIndex];
     const isCorrect = selectedAnswer === currentQuestion.correct_answer;
 
-    // I-save agad ang sagot sa quiz_answers para hindi mawala kapag lumabas ang user
     setSaving(true);
     try {
       await saveQuizAnswers([
@@ -191,7 +185,7 @@ export default function DestinationDetailScreen({ route, navigation }) {
     } else {
       // Tapos na ang round
       setQuizCompleted(true);
-      loadDestinationData(); // i-refresh ang progress card
+      loadDestinationData();
     }
   };
 
@@ -201,7 +195,7 @@ export default function DestinationDetailScreen({ route, navigation }) {
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setScore(0);
-    loadDestinationData(); // i-update ang progress kapag umalis sa gitna
+    loadDestinationData();
   };
 
   const handleView360 = async () => {

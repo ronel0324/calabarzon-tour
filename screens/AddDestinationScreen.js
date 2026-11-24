@@ -28,8 +28,6 @@ const CATEGORIES = [
   'Other'
 ];
 
-// FIX: Hindi gumagana ang Alert.alert sa web (walang lumalabas at hindi tumatakbo ang onPress).
-// Kaya gumamit ng window.alert sa web at normal na Alert sa phone.
 const notify = (title, message, onOk) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}\n\n${message}`);
@@ -48,7 +46,7 @@ export default function AddDestinationScreen({ navigation }) {
     image: '',
     historical_info: '',
     cultural_significance: '',
-    latitude: 14.1008, // Default to CALABARZON center
+    latitude: 14.1008,
     longitude: 121.0794
   });
   const [panoramaUri, setPanoramaUri] = useState(null);
@@ -75,7 +73,6 @@ export default function AddDestinationScreen({ navigation }) {
   };
 
   const pickImage = async () => {
-    // Sa web, hindi kailangan ng permission
     if (Platform.OS !== 'web') {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
@@ -128,10 +125,9 @@ export default function AddDestinationScreen({ navigation }) {
 
     setSaving(true);
     try {
-      // Ang larawan ay awtomatikong ina-upload sa Supabase Storage ng database.js
       const newId = await addDestination({
         ...formData,
-        category: formData.categories.join(', ') // hal. "Cultural Heritage, Mountain"
+        category: formData.categories.join(', ')
       });
 
       if (panoramaUri) {
@@ -156,7 +152,6 @@ export default function AddDestinationScreen({ navigation }) {
     }
   };
 
-  // Parehong istruktura ng EditDestinationScreen (gumagana na): walang KeyboardAvoidingView
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -207,7 +202,6 @@ export default function AddDestinationScreen({ navigation }) {
             onChangeText={(text) => handleInputChange('address', text)}
           />
 
-          {/* Mapa sa phone, lat/long input sa web */}
           <LocationPicker
             latitude={formData.latitude}
             longitude={formData.longitude}
@@ -266,7 +260,6 @@ export default function AddDestinationScreen({ navigation }) {
             onChangeText={(text) => handleInputChange('image', text)}
           />
 
-          {/* ---- 360° SECTION ---- */}
           <Text style={styles.label}>360° Image (optional)</Text>
           <Text style={styles.helperText}>
             The ratio must be 2:1 (e.g., 4096×2048), coming from a 360 camera or Photo Sphere. The upload limit is up to 50 MB.
@@ -281,7 +274,6 @@ export default function AddDestinationScreen({ navigation }) {
               <Text style={styles.removePanoramaText}>Remove 360° image</Text>
             </TouchableOpacity>
           )}
-          {/* ---- DULO NG 360° SECTION ---- */}
 
           <TouchableOpacity
             style={[styles.submitButton, saving && { opacity: 0.6 }]}

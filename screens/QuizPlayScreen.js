@@ -50,7 +50,6 @@ const KEYS = ['A', 'B', 'C', 'D'];
 
 const optionText = (q, key) => q[`option_${key.toLowerCase()}`];
 
-// Sinusuportahan ang correct_answer na letter ("B") o mismong text ng sagot
 const correctKeyOf = (q) => {
   const ca = String(q.correct_answer || '').trim();
   if (/^[a-d]$/i.test(ca)) return ca.toUpperCase();
@@ -62,9 +61,9 @@ export default function QuizPlayScreen({ route, navigation }) {
   const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
-  const [questions, setQuestions] = useState([]); // lahat ng tanong ng province, nakaayos ayon sa id
-  const [answers, setAnswers] = useState(new Map()); // question_id -> { selected_answer, is_correct }
-  const [pos, setPos] = useState(0); // kasalukuyang tanong; kapag = questions.length, tapos na
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState(new Map());
+  const [pos, setPos] = useState(0);
   const [saving, setSaving] = useState(false);
   const [sessionAnswered, setSessionAnswered] = useState(0);
   const [sessionCorrect, setSessionCorrect] = useState(0);
@@ -101,14 +100,13 @@ export default function QuizPlayScreen({ route, navigation }) {
       aRes.data.map((a) => [a.question_id, { selected_answer: a.selected_answer, is_correct: a.is_correct }])
     );
 
-    // Nasagutan na muna (para sa review), tapos ang hindi pa nasasagutan na naka-shuffle
     const answered = inProvince.filter((q) => answerMap.has(q.id));
     const unanswered = shuffle(inProvince.filter((q) => !answerMap.has(q.id)));
     const ordered = [...answered, ...unanswered];
 
     setQuestions(ordered);
     setAnswers(answerMap);
-    setPos(answered.length); // simula sa unang hindi pa nasasagutan
+    setPos(answered.length);
     setLoading(false);
   }, [province, user?.id]);
 
@@ -120,7 +118,7 @@ export default function QuizPlayScreen({ route, navigation }) {
   const finished = !loading && pos >= total;
   const current = !finished ? questions[pos] : null;
   const myAnswer = current ? answers.get(current.id) : null;
-  const locked = !!myAnswer; // nasagutan na (kasama ang review)
+  const locked = !!myAnswer;
   const correctKey = current ? correctKeyOf(current) : null;
   const myKey = myAnswer?.selected_answer || null;
 
@@ -129,7 +127,6 @@ export default function QuizPlayScreen({ route, navigation }) {
     const isCorrect = key === correctKey;
     setSaving(true);
 
-    // Sine-save agad ang bawat sagot para tuloy ang resume kahit mag-exit
     const { error } = await supabase.from('quiz_answers').upsert(
       {
         user_id: user.id,

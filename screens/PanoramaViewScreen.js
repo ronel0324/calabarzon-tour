@@ -36,7 +36,6 @@ import { useAuth } from '../context/AuthContext';
 
 const { width, height } = Dimensions.get('window');
 
-// Alert.alert na may buttons ay hindi gumagana sa web, kaya may fallback.
 const notify = (title, message) => {
   if (Platform.OS === 'web') {
     window.alert(message ? `${title}\n${message}` : title);
@@ -69,11 +68,10 @@ const PanoramaViewScreen = ({ route, navigation }) => {
   const [showNavigationMenu, setShowNavigationMenu] = useState(false);
   const [panoramaUri, setPanoramaUri] = useState(null);
 
-  // Info hotspots
   const [infoHotspots, setInfoHotspots] = useState([]);
-  const [selectedInfo, setSelectedInfo] = useState(null); // para sa view modal
+  const [selectedInfo, setSelectedInfo] = useState(null);
   const [editMode, setEditMode] = useState(false);
-  const [draft, setDraft] = useState(null); // { yaw, pitch }
+  const [draft, setDraft] = useState(null);
   const [formVisible, setFormVisible] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formTitle, setFormTitle] = useState('');
@@ -82,7 +80,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
 
-  // Pagdagdag ng 360 point at link (arrow)
   const [chooserVisible, setChooserVisible] = useState(false);
   const [pointFormVisible, setPointFormVisible] = useState(false);
   const [newPointName, setNewPointName] = useState('');
@@ -97,7 +94,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
     loadAllPoints();
   }, [entryPointId]);
 
-  // Web lang: i-paste ang kinopyang larawan (Ctrl+V) habang bukas ang Info form
   useEffect(() => {
     if (Platform.OS !== 'web' || !formVisible) return;
 
@@ -133,7 +129,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
       const list = await getInfoHotspotsByPoint(pointId);
       setInfoHotspots(list);
     } catch (error) {
-      // Hindi dapat masira ang buong tour kung wala pang table
       console.error('Error loading info hotspots:', error);
       setInfoHotspots([]);
     }
@@ -155,7 +150,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
       setFormVisible(false);
       setSelectedInfo(null);
 
-      // Get current panorama point
       const point = await getPanoramaPointById(pointId);
       if (!point) {
         Alert.alert('Error', 'Panorama point not found');
@@ -166,7 +160,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
       setCurrentPoint(point);
       setPanoramaUri(await resolvePanorama(point.panorama_image));
 
-      // Get connections from this point
       const pointConnections = await getPanoramaConnections(pointId);
       setConnections(pointConnections);
 
@@ -187,7 +180,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
 
   const handleHotspotPress = (hotspot) => {
     if (CAN_EDIT && editMode) {
-      // Sa edit mode, ang pindot sa pulang arrow ay pagbura (hindi paglipat)
       confirmAction(
         'Burahin ang arrow?',
         `Buburahin ang link papuntang "${hotspot.to_point_name || 'point'}".`,
@@ -211,8 +203,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
     setShowMiniMap(!showMiniMap);
   };
 
-  // ---------- Info hotspot handlers ----------
-
   const handleInfoHotspotPress = (hotspot) => {
     if (CAN_EDIT && editMode) {
       openEditForm(hotspot);
@@ -221,7 +211,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
     }
   };
 
-  // Sa iOS, hindi puwedeng sabay ang pagsara at pagbukas ng Modal
   const afterModal = (fn) => setTimeout(fn, Platform.OS === 'ios' ? 350 : 0);
 
   const handlePlaceHotspot = ({ yaw, pitch }) => {
@@ -277,7 +266,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
   const uploadFromUri = async (uri, width) => {
     try {
       setUploading(true);
-      // Paliitin muna: 1600 px ang lapad (hindi ginagalaw kung mas maliit na)
       const actions = width && width > 1600 ? [{ resize: { width: 1600 } }] : [];
       const resized = await ImageManipulator.manipulateAsync(uri, actions, {
         compress: 0.8,
@@ -315,7 +303,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
     if (!draft || !currentPoint) return;
     try {
       setSaving(true);
-      // yaw/pitch -> hotspot_x/hotspot_y (kabaligtaran ng ginagawa ng viewer)
       const toX = (yaw) => normalizeYaw(yaw) / 360 + 0.5;
       const toY = (pitch) => 0.5 - pitch / 180;
 
@@ -328,7 +315,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
       });
 
       if (linkBack) {
-        // Arrow pabalik sa kabilang larawan, sa kabilang direksyon (burahin/ulitin kung mali ang pwesto)
         await addPanoramaConnection({
           from_point_id: linkTargetId,
           to_point_id: currentPoint.id,
@@ -354,7 +340,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
       if (result.canceled) return;
       const asset = result.assets[0];
       setUploading(true);
-      // Hanggang 4096 px ang lapad para kayanin ng phone
       const actions = asset.width && asset.width > 4096
         ? [{ resize: { width: 4096 } }]
         : [];
@@ -391,7 +376,7 @@ const PanoramaViewScreen = ({ route, navigation }) => {
       await addPanoramaPoint({
         destination_id: destinationId,
         name: newPointName.trim(),
-        panorama_image: newPointImageUri, // mag-a-upload ang addPanoramaPoint
+        panorama_image: newPointImageUri,
         rotation: 0,
         is_entry_point: false
       });
@@ -467,7 +452,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Panorama Viewer */}
       {currentPoint && panoramaUri && (
         <PanoramaViewer
           panoramaImage={panoramaUri}
@@ -482,7 +466,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         />
       )}
 
-      {/* Header Bar */}
       <View style={styles.headerBar}>
         <TouchableOpacity
           style={styles.backButton}
@@ -498,7 +481,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </View>
       </View>
 
-      {/* Edit mode banner */}
       {editMode && (
         <View style={styles.editBanner}>
           <Text style={styles.editBannerText}>
@@ -507,7 +489,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </View>
       )}
 
-      {/* Mini Map */}
       {showMiniMap && allPoints.length > 0 && (
         <View style={styles.miniMapContainer}>
           <View style={styles.miniMapHeader}>
@@ -535,9 +516,7 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </View>
       )}
 
-      {/* Navigation Controls */}
       <View style={styles.controlsContainer}>
-        {/* Show/Hide Mini Map */}
         <TouchableOpacity
           style={styles.controlButton}
           onPress={toggleMiniMap}
@@ -547,7 +526,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
           </Text>
         </TouchableOpacity>
 
-        {/* Navigation Menu */}
         {connections.length > 0 && (
           <TouchableOpacity
             style={[styles.controlButton, styles.navigationButton]}
@@ -559,7 +537,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         )}
 
-        {/* Info Button */}
         <TouchableOpacity
           style={styles.controlButton}
           onPress={() => {
@@ -569,7 +546,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
           <Text style={styles.controlButtonText}>ℹ️ Info</Text>
         </TouchableOpacity>
 
-        {/* Magdagdag ng bagong 360 point */}
         {CAN_EDIT && editMode && (
           <TouchableOpacity
             style={[styles.controlButton, styles.editActiveButton]}
@@ -579,7 +555,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         )}
 
-        {/* Edit toggle */}
         {CAN_EDIT && (
           <TouchableOpacity
             style={[styles.controlButton, editMode && styles.editActiveButton]}
@@ -595,7 +570,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         )}
       </View>
 
-      {/* Help Text */}
       <View style={styles.helpContainer}>
         <Text style={styles.helpText}>
           👆 Drag to look around • {connections.length > 0 ? 'Tap red markers to move' : 'No navigation points available'}
@@ -603,7 +577,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </Text>
       </View>
 
-      {/* Info Hotspot Modal (yung lalabas kapag pinindot ang "i") */}
       <Modal
         visible={!!selectedInfo}
         transparent={true}
@@ -637,7 +610,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      {/* Pagpili: Info o Link */}
       <Modal
         visible={chooserVisible}
         transparent={true}
@@ -669,7 +641,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </View>
       </Modal>
 
-      {/* Link form: pumili ng pupuntahan */}
       <Modal
         visible={linkFormVisible}
         transparent={true}
@@ -741,7 +712,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Magdagdag ng bagong 360 point */}
       <Modal
         visible={pointFormVisible}
         transparent={true}
@@ -804,7 +774,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Add/Edit Hotspot Form */}
       <Modal
         visible={formVisible}
         transparent={true}
@@ -887,7 +856,6 @@ const PanoramaViewScreen = ({ route, navigation }) => {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Navigation Menu Modal */}
       <Modal
         visible={showNavigationMenu}
         transparent={true}
@@ -1094,7 +1062,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20
   },
-  // Info card (purple, parang sa screenshot)
   infoCard: {
     backgroundColor: '#5B3F8C',
     borderRadius: 12,
@@ -1136,7 +1103,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600'
   },
-  // Form
   formCard: {
     backgroundColor: '#fff',
     borderRadius: 15,

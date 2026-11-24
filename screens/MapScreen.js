@@ -32,7 +32,6 @@ import { supabase } from '../services/supabase';
 
 const CALABARZON_CENTER = { latitude: 14.1008, longitude: 121.0794, zoom: 9 };
 
-// Naka-labas sa component para hindi nagbabago ang reference sa bawat render
 const ORIGIN_WHITELIST = ['*'];
 
 const renderMapLoading = () => (
@@ -41,7 +40,6 @@ const renderMapLoading = () => (
   </View>
 );
 
-// Alert.alert ay hindi gumagana sa web, kaya window.alert doon
 const notify = (title, message) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}\n\n${message}`);
@@ -50,7 +48,6 @@ const notify = (title, message) => {
   }
 };
 
-// Category colors for pins
 const categoryColors = {
   'Natural Wonder': '#4CAF50',
   'Historical Site': '#FF9800',
@@ -62,21 +59,17 @@ const categoryColors = {
   'Other': '#607D8B'
 };
 
-// Kulay ng pin: kunin ang unang category kung marami (hal. "Beach, Mountain")
 const getPinColor = (category) => {
   const first = (category || '').split(',')[0].trim();
   return categoryColors[first] || categoryColors['Other'];
 };
 
-// Mga pagpipilian sa filter
 const PROVINCES = ['All', 'Cavite', 'Laguna', 'Batangas', 'Rizal', 'Quezon'];
 const CATEGORY_OPTIONS = ['All', ...Object.keys(categoryColors)];
 
-// Tanggalin ang accent (Biñan, Los Baños, Dasmariñas) para tugma kahit walang ñ
 const normalize = (s) =>
   (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-// Mga bayan/lugar bawat province. Dagdagan lang kapag may bagong destination.
 const PROVINCE_TOWNS = {
   Quezon: [
     'Agdangan', 'Alabat', 'Atimonan', 'Buenavista', 'Burdeos', 'Calauag',
@@ -119,7 +112,7 @@ const PROVINCE_NAMES = Object.keys(PROVINCE_TOWNS);
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-// "Rizal St.", "Quezon Ave", "Laguna Blvd" ay pangalan ng kalye, hindi province
+
 const STREET_SUFFIX =
   '(?:st|street|ave|avenue|rd|road|blvd|boulevard|highway|hwy|ext|extension|drive|dr|lane)(?![a-z])';
 const stripStreetNames = (text) =>
@@ -131,7 +124,6 @@ const stripStreetNames = (text) =>
     '$1 '
   );
 
-// Posisyon ng huling buong-salita na tugma (-1 kung wala)
 const lastIndexOfWord = (text, word) => {
   const re = new RegExp(`(^|[^a-z])${escapeRegex(normalize(word))}(?![a-z])`, 'g');
   let last = -1;
@@ -140,7 +132,6 @@ const lastIndexOfWord = (text, word) => {
   return last;
 };
 
-// Alamin ang province ng destination: 1) `province` field, 2) huling lugar sa address
 const getProvinceOf = (dest) => {
   const explicit = PROVINCE_NAMES.find((p) => normalize(p) === normalize(dest.province));
   if (explicit) return explicit;
@@ -151,7 +142,7 @@ const getProvinceOf = (dest) => {
   PROVINCE_NAMES.forEach((p) => {
     [p, ...PROVINCE_TOWNS[p]].forEach((word) => {
       const pos = lastIndexOfWord(text, word);
-      const isOwnName = word === p; // pangalan mismo ng province ("Rizal" = Rizal province)
+      const isOwnName = word === p;
       if (pos > bestPos || (pos === bestPos && pos >= 0 && isOwnName)) {
         best = p;
         bestPos = pos;
@@ -166,7 +157,6 @@ const matchesProvince = (dest, province) => {
   return getProvinceOf(dest) === province;
 };
 
-// Category: kaya ang maraming category sa isang destination (hal. "Beach, Mountain")
 const matchesCategory = (dest, category) => {
   if (category === 'All') return true;
   return (dest.category || '')
@@ -175,8 +165,6 @@ const matchesCategory = (dest, category) => {
     .includes(category);
 };
 
-// Leaflet + OpenStreetMap (walang API key na kailangan)
-// Optimized: canvas markers + clustering + diff update
 const buildMapHtml = () => `
 <!DOCTYPE html>
 <html>
@@ -220,10 +208,8 @@ const buildMapHtml = () => `
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // Hugis ng pin (viewBox 36x48): bilog sa taas, matulis sa ilalim
     var PIN_PATH = 'M18 1C8.6 1 1 8.6 1 18c0 12.5 17 29 17 29s17-16.5 17-29C35 8.6 27.4 1 18 1z';
 
-    // Clustering: pinagsasama ang magkakalapit na pin kapag naka-zoom out
     var cluster = L.markerClusterGroup({
       chunkedLoading: true,
       maxClusterRadius: 80,
@@ -253,10 +239,9 @@ const buildMapHtml = () => `
     });
     map.addLayer(cluster);
 
-    var markers = {};   // id -> marker
+    var markers = {};
     var meMarker = null;
 
-    // Isang icon bawat kulay, ginagamit ulit (cached) para magaan
     var iconCache = {};
     function pinIcon(color) {
       if (iconCache[color]) return iconCache[color];
@@ -277,7 +262,6 @@ const buildMapHtml = () => `
       window.ReactNativeWebView.postMessage(JSON.stringify(data));
     }
 
-    // Idagdag/alisin lang ang nagbago, hindi ginagawa ulit ang lahat
     window.setDestinations = function (list, fit) {
       var next = {};
       var toAdd = [];
@@ -309,7 +293,6 @@ const buildMapHtml = () => `
       if (toRemove.length) cluster.removeLayers(toRemove);
       if (toAdd.length) cluster.addLayers(toAdd);
 
-      // Kapag nagbago ang filter, i-zoom ang mapa sa mga natirang pin
       if (fit && list.length > 0) {
         if (list.length === 1) {
           map.setView([list[0].latitude, list[0].longitude], 11, { animate: true, duration: 0.5 });
@@ -327,7 +310,6 @@ const buildMapHtml = () => `
       if (fly) { map.setView([lat, lng], 10, { animate: true, duration: 0.6 }); }
     };
 
-    // Lipad sa napiling destination
     window.focusOn = function (lat, lng) {
       map.setView([lat, lng], 15, { animate: true, duration: 0.6 });
     };
@@ -342,7 +324,6 @@ const buildMapHtml = () => `
 </html>
 `;
 
-// Styles ng hamburger menu at filter panel (hiwalay para hindi galawin ang mapStyles.js)
 const menuStyles = StyleSheet.create({
   topBar: {
     flexDirection: 'row',
@@ -507,20 +488,17 @@ const MapScreen = ({ navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showMenu, setShowMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Quiz: nasa loob ng MapScreen, hindi na lilipat ng screen
   const [showQuiz, setShowQuiz] = useState(false);
   const [showMedia, setShowMedia] = useState(false);
   const [quizDest, setQuizDest] = useState(null);
-  const [quizTotal, setQuizTotal] = useState(0); // lahat ng tanong ng destination
-  const [quizAnswered, setQuizAnswered] = useState(0); // ilan na ang nasagutan dati
-  const [quizQueue, setQuizQueue] = useState([]); // mga hindi pa nasasagutan
+  const [quizTotal, setQuizTotal] = useState(0);
+  const [quizAnswered, setQuizAnswered] = useState(0);
+  const [quizQueue, setQuizQueue] = useState([]);
   const [quizIndex, setQuizIndex] = useState(0);
   const [quizSelected, setQuizSelected] = useState(null);
   const [quizScore, setQuizScore] = useState(0);
   const [quizCompleted, setQuizCompleted] = useState(false);
   const [quizSaving, setQuizSaving] = useState(false);
-  // Status ng quiz ng napiling destination (para sa label ng button sa popup)
   const [selectedQuizInfo, setSelectedQuizInfo] = useState({ total: 0, answered: 0, loaded: false });
 
   const activeFilterCount =
@@ -533,14 +511,11 @@ const MapScreen = ({ navigation }) => {
   const filterKeyRef = useRef('All|All');
   const webViewRef = useRef(null);
 
-  // Laki ng system bars (home button / gesture bar) at ng screen
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
 
-  // Isang beses lang gagawin ang source para hindi nagre-reload ang WebView
   const mapSource = useMemo(() => ({ html: buildMapHtml() }), []);
 
-  // Mabilis na hanapan ng destination kapag may na-tap na pin
   const destinationsById = useMemo(() => {
     const m = new Map();
     destinations.forEach((d) => m.set(String(d.id), d));
@@ -557,7 +532,6 @@ const MapScreen = ({ navigation }) => {
     loadDestinations();
   }, []);
 
-  // Realtime: sumusunod ang mapa sa pagdagdag/pag-edit/pagbura ng destination
   useEffect(() => {
     const channel = supabase
       .channel('destinations-live')
@@ -578,7 +552,6 @@ const MapScreen = ({ navigation }) => {
           setDestinations((prev) => {
             const old = prev.find((d) => String(d.id) === String(row.id));
             const without = prev.filter((d) => String(d.id) !== String(row.id));
-            // Walang coordinates = hindi ilalagay sa mapa (tulad ng loadDestinations)
             return hasCoords ? [...without, { ...old, ...row }] : without;
           });
         }
@@ -590,7 +563,6 @@ const MapScreen = ({ navigation }) => {
     };
   }, []);
 
-  // Destinations na pasok sa napiling province at category
   const filteredDestinations = useMemo(
     () =>
       destinations.filter(
@@ -600,7 +572,6 @@ const MapScreen = ({ navigation }) => {
     [destinations, selectedProvince, selectedCategory]
   );
 
-  // Search: hanapin sa pangalan o address (lahat ng destinations, hindi lang yung filtered)
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return [];
@@ -618,7 +589,6 @@ const MapScreen = ({ navigation }) => {
   const handleSelectSearch = (dest) => {
     Keyboard.dismiss();
     setSearchQuery('');
-    // Kung natatakpan ng filter ang pin, alisin muna ang filter
     const visible = filteredDestinations.some((d) => String(d.id) === String(dest.id));
     if (!visible) resetFilters();
     setTimeout(
@@ -627,7 +597,6 @@ const MapScreen = ({ navigation }) => {
     );
   };
 
-  // Ipadala ang (filtered) destinations sa map kapag ready na ang map at may data
   useEffect(() => {
     if (!mapReady) return;
     const payload = filteredDestinations.map((d) => ({
@@ -637,7 +606,6 @@ const MapScreen = ({ navigation }) => {
       color: getPinColor(d.category)
     }));
 
-    // i-zoom lang ang mapa kapag filter ang nagbago (hindi kapag nag-reload)
     const key = `${selectedProvince}|${selectedCategory}`;
     const filterChanged = filterKeyRef.current !== key;
     filterKeyRef.current = key;
@@ -645,7 +613,6 @@ const MapScreen = ({ navigation }) => {
     runInMap(`window.setDestinations(${JSON.stringify(payload)}, ${filterChanged})`);
   }, [mapReady, filteredDestinations]);
 
-  // Kunin ang lokasyon ng user kapag ready na ang map
   useEffect(() => {
     if (mapReady) {
       getUserLocation(false);
@@ -656,7 +623,6 @@ const MapScreen = ({ navigation }) => {
     try {
       const allDestinations = await getAllDestinations();
 
-      // Filter destinations that have coordinates
       const destinationsWithCoords = allDestinations.filter(
         (dest) => dest.latitude && dest.longitude
       );
@@ -688,7 +654,6 @@ const MapScreen = ({ navigation }) => {
         return;
       }
 
-      // Kapag background na pagkuha (hindi button), gamitin ang last known para mabilis
       const location =
         (!showAlert && (await Location.getLastKnownPositionAsync())) ||
         (await Location.getCurrentPositionAsync({
@@ -714,7 +679,6 @@ const MapScreen = ({ navigation }) => {
           const destination = destinationsById.get(String(data.id));
           if (!destination) return;
 
-          // Ilabas agad ang modal, saka hintayin ang panorama check
           setSelectedDestination(destination);
           setSelectedHasPanorama(false);
           setSelectedQuizInfo({ total: 0, answered: 0, loaded: false });
@@ -723,7 +687,6 @@ const MapScreen = ({ navigation }) => {
           const entry = await getEntryPanoramaPoint(destination.id);
           setSelectedHasPanorama(!!entry);
 
-          // Ilan ang tanong at ilan na ang nasagutan (galing quiz_answers)
           try {
             const questions = await getQuizQuestionsByDestination(destination.id);
             const answers = await getQuizAnswersForQuestions(questions.map((q) => q.id));
@@ -765,7 +728,6 @@ const MapScreen = ({ navigation }) => {
     });
   };
 
-  // Simulan ang quiz dito mismo sa MapScreen (parehong logic sa DestinationDetailScreen)
   const handleTakeQuiz = async () => {
     const dest = selectedDestination;
     if (!dest) return;
@@ -777,7 +739,6 @@ const MapScreen = ({ navigation }) => {
         return;
       }
 
-      // Mga tanong lang na hindi pa nasasagutan ang ilalabas (resume)
       const answers = await getQuizAnswersForQuestions(questions.map((q) => q.id));
       const answeredIds = new Set(answers.map((a) => a.question_id));
       const remaining = questions.filter((q) => !answeredIds.has(q.id));
@@ -795,9 +756,7 @@ const MapScreen = ({ navigation }) => {
       setQuizSelected(null);
       setQuizScore(0);
       setQuizCompleted(false);
-
       setShowInfoModal(false);
-      // Maikling antala para hindi mag-banggaan ang dalawang modal (lalo na sa iOS)
       setTimeout(() => setShowQuiz(true), 300);
     } catch (error) {
       console.error('Error starting quiz:', error);
@@ -815,7 +774,6 @@ const MapScreen = ({ navigation }) => {
     const currentQuestion = quizQueue[quizIndex];
     const isCorrect = quizSelected === currentQuestion.correct_answer;
 
-    // I-save agad ang sagot para hindi mawala kapag lumabas ang user
     setQuizSaving(true);
     try {
       await saveQuizAnswers([
@@ -853,7 +811,6 @@ const MapScreen = ({ navigation }) => {
 
   const handleOpenMedia = () => {
   setShowInfoModal(false);
-  // Maikling antala para hindi mag-banggaan ang dalawang modal
   setTimeout(() => setShowMedia(true), 300);
 };
 
@@ -861,7 +818,6 @@ const MapScreen = ({ navigation }) => {
     runInMap('window.centerMap()');
   };
 
-  // Label ng quiz button: kapareho ng sa DestinationDetailScreen
   const quizRemaining = selectedQuizInfo.total - selectedQuizInfo.answered;
   const quizButtonDisabled =
     !selectedQuizInfo.loaded || selectedQuizInfo.total === 0 || quizRemaining <= 0;
@@ -878,7 +834,6 @@ const MapScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Top bar: hamburger menu (nasa loob ang filters) */}
         <View style={menuStyles.topBar}>
           <TouchableOpacity
             style={menuStyles.menuButton}
@@ -921,9 +876,7 @@ const MapScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Map area (map + buttons + counter) */}
         <View style={styles.mapWrapper}>
-          {/* Map View (Leaflet + OpenStreetMap) */}
           <MapWebView
             ref={webViewRef}
             style={styles.map}
@@ -936,7 +889,6 @@ const MapScreen = ({ navigation }) => {
             renderLoading={renderMapLoading}
           />
 
-          {/* Control Buttons */}
           <View style={styles.controlsContainer}>
             <TouchableOpacity style={styles.controlButton} onPress={centerOnCALABARZON}>
               <Text style={styles.controlButtonText}>🎯 Center</Text>
@@ -946,14 +898,12 @@ const MapScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Destination Counter */}
           <View style={styles.counterContainer}>
             <Text style={styles.counterText}>
               📍 {filteredDestinations.length} Destinations
             </Text>
           </View>
 
-          {/* Search suggestions */}
           {searchQuery.trim().length > 0 && (
             <View style={menuStyles.suggestions}>
               {searchResults.length === 0 ? (
@@ -988,7 +938,6 @@ const MapScreen = ({ navigation }) => {
           )}
         </View>
 
-        {/* Legend: nasa ilalim na ng mapa, at may espasyo para sa home button */}
         <View
           style={[
             styles.legendContainer,
@@ -1006,7 +955,6 @@ const MapScreen = ({ navigation }) => {
           </ScrollView>
         </View>
 
-        {/* Hamburger menu: side panel na may Province at Category filters */}
         <Modal
           visible={showMenu}
           transparent={true}
@@ -1086,7 +1034,6 @@ const MapScreen = ({ navigation }) => {
               </View>
             </View>
 
-            {/* Pindutin ang madilim na bahagi para isara */}
             <TouchableOpacity
               style={menuStyles.backdrop}
               activeOpacity={1}
@@ -1095,7 +1042,6 @@ const MapScreen = ({ navigation }) => {
           </View>
         </Modal>
 
-        {/* Info Modal */}
         <Modal
           visible={showInfoModal}
           transparent={true}
@@ -1111,7 +1057,6 @@ const MapScreen = ({ navigation }) => {
             >
               {selectedDestination && (
                 <>
-                  {/* Image */}
                   {selectedDestination.image && (
                     <Image
                       source={{ uri: selectedDestination.image }}
@@ -1120,7 +1065,6 @@ const MapScreen = ({ navigation }) => {
                     />
                   )}
 
-                  {/* Destination Info */}
                   <ScrollView style={styles.modalScrollView}>
                     <Text style={styles.modalTitle}>{selectedDestination.name}</Text>
 
@@ -1185,7 +1129,6 @@ const MapScreen = ({ navigation }) => {
           </View>
         </Modal>
 
-        {/* Quiz Modal: dito mismo sa MapScreen, parehong design ng DestinationDetailScreen */}
         <Modal visible={showQuiz} animationType="slide" onRequestClose={closeQuiz}>
           <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
             {quizCompleted ? (

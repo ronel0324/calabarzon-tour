@@ -3,7 +3,6 @@ import { View, Text, Image, ScrollView, ActivityIndicator, StyleSheet } from 're
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { COLORS, SERIF } from '../theme';
-// Ayusin ang path na ito kung nasaan ang Supabase client mo
 import { supabase } from '../services/supabase';
 
 const TOP = 20;
@@ -96,7 +95,6 @@ export default function LeaderboardScreen() {
         )}
       </ScrollView>
 
-      {/* Ranggo mo, kung wala ka sa top 20 */}
       {!loading && !error && rows.length > 0 && (
         <View style={styles.footer}>
           {myIndex >= TOP ? (

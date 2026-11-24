@@ -28,7 +28,7 @@ const guessType = (uri, headerType) => {
   return 'image/jpeg';
 };
 
-// Nag-uupload ng larawan sa Supabase Storage at nagbabalik ng public URL
+
 export const uploadImage = async (uri) => {
   const res = await fetch(uri);
   const arrayBuffer = await res.arrayBuffer();
@@ -45,7 +45,6 @@ export const uploadImage = async (uri) => {
   return data.publicUrl;
 };
 
-// Kung local ang larawan (galing sa image picker), i-upload muna. Kung URL na, ibalik lang.
 const ensureRemoteImage = async (image) => {
   if (!image) return image;
   if (isLocalUri(image)) return await uploadImage(image);
