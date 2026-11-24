@@ -47,3 +47,5 @@ android_backup/
 *.aab
 *.jks
 *.keystore
+
+.claude/
