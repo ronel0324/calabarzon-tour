@@ -41,7 +41,7 @@
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#0f4a28",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/adaptive-icon.png"
       },
       "package": "com.calabarzon.virtualtour",
       "permissions": [
@@ -64,9 +64,7 @@
         "projectId": "d227592b-00cc-4049-bbf4-801402a314d1"
       }
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/d227592b-00cc-4049-bbf4-801402a314d1"
     }
