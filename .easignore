@@ -2,8 +2,7 @@ dist
 node_modules
 .git
 .expo
+android
+android_old
 android_backup
-android/build
-android/app/build
-android/.gradle
-android/app/.cxx
+ios
