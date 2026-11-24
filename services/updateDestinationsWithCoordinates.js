@@ -1,15 +1,10 @@
 import { getAllDestinations, updateDestination } from './database';
 
-/**
- * Update existing destinations with coordinates
- * Run this once if your destinations don't have coordinates
- */
 export const updateDestinationsWithCoordinates = async () => {
   try {
     const destinations = await getAllDestinations();
     console.log('🔄 Updating destinations with coordinates...');
     
-    // Coordinates for CALABARZON destinations
     const coordinates = {
       'Taal Volcano': { latitude: 14.0091, longitude: 120.9931 },
       'Pagsanjan Falls': { latitude: 14.2655556, longitude: 121.4886111 },
@@ -22,7 +17,6 @@ export const updateDestinationsWithCoordinates = async () => {
     for (const dest of destinations) {
       const coords = coordinates[dest.name];
       if (coords) {
-        // Update coordinates (force update to fix incorrect ones)
         const needsUpdate = !dest.latitude || !dest.longitude || 
                            (dest.name === 'Villa Escudero' && dest.latitude !== 13.995773) ||
                            (dest.name === 'Pagsanjan Falls' && dest.latitude !== 14.2655556) ||

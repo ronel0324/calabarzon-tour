@@ -1,8 +1,8 @@
 const http = require('http');
 const net = require('net');
 
-const TARGET_PORT = 8081; // port ng Expo
-const PORT = 8082;        // dito ka magbubukas
+const TARGET_PORT = 8081;
+const PORT = 8082;
 
 const server = http.createServer((req, res) => {
   const proxyReq = http.request(
@@ -20,7 +20,6 @@ const server = http.createServer((req, res) => {
   req.pipe(proxyReq);
 });
 
-// para gumana pa rin ang hot reload (websocket)
 server.on('upgrade', (req, socket, head) => {
   const upstream = net.connect(TARGET_PORT, 'localhost', () => {
     const lines = Object.entries(req.headers).map(([k, v]) => `${k}: ${v}`).join('\r\n');

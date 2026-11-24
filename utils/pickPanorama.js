@@ -1,7 +1,6 @@
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 
-// Gumagana ang Alert.alert sa phone lang; sa web gumamit ng window.alert
 const notify = (title, message) => {
   if (Platform.OS === 'web') {
     window.alert(`${title}\n\n${message}`);
@@ -11,7 +10,6 @@ const notify = (title, message) => {
 };
 
 export async function pickPanoramaImage() {
-  // Sa web, hindi kailangan ng permission
   if (Platform.OS !== 'web') {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -22,7 +20,7 @@ export async function pickPanoramaImage() {
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    allowsEditing: false, // huwag i-crop, masisira ang 2:1
+    allowsEditing: false,
     quality: 0.7
   });
   if (result.canceled) return null;
@@ -37,8 +35,5 @@ export async function pickPanoramaImage() {
     return null;
   }
 
-  // FIX: Tinanggal ang expo-file-system (hindi gumagana sa web).
-  // Ang pagkopya sa permanenteng folder ay hindi na kailangan dahil
-  // ina-upload na ang larawan sa Supabase Storage ng addPanoramaPoint (database.js).
   return asset.uri;
 }

@@ -2,7 +2,6 @@ import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
 import * as FileSystem from 'expo-file-system/legacy';
 
-// Dapat static string ang path sa require() (rule ng Metro)
 const LOCAL = {
   RIZALSHRINE: require('../assets/panoramas/RIZALSHRINE.jpg'),
   MALAGONLONG: require('../assets/panoramas/MALAGONLONG.jpg'),
@@ -13,9 +12,8 @@ const LOCAL = {
 
 export async function resolvePanorama(value) {
   if (!value) return null;
-  if (/^(https?:|data:)/.test(value)) return value; // URL na, ibalik lang
+  if (/^(https?:|data:)/.test(value)) return value;
 
-  // Galing sa user upload (file path)
   if (value.startsWith('file://')) {
     const b64 = await FileSystem.readAsStringAsync(value, { encoding: 'base64' });
     return `data:image/jpeg;base64,${b64}`;
@@ -26,7 +24,6 @@ export async function resolvePanorama(value) {
 
   const asset = Asset.fromModule(mod);
 
-  // BAGO: sa web, walang file system. Ang asset ay may sarili nang URL.
   if (Platform.OS === 'web') {
     return asset.uri;
   }

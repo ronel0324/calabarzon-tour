@@ -7,8 +7,6 @@ import { updateDestinationsWithCoordinates } from './services/updateDestinations
 import { COLORS, SERIF } from './theme';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AppSplash from './components/AppSplash';
-
-// Import screens
 import AuthScreen from './screens/AuthScreen';
 import HomeScreen from './screens/HomeScreen';
 import DestinationListScreen from './screens/DestinationListScreen';
@@ -34,7 +32,6 @@ function RootNavigator() {
 
   return (
     <NavigationContainer>
-      {/* "light" dahil madilim na teal ang header */}
       <StatusBar style="light" backgroundColor={COLORS.taal} />
       <Stack.Navigator
         screenOptions={{
@@ -46,7 +43,6 @@ function RootNavigator() {
         }}
       >
         {!session ? (
-          // Hindi pa naka-login
           <Stack.Screen name="Auth" component={AuthScreen} options={{ headerShown: false }} />
         ) : (
           <>
@@ -65,7 +61,6 @@ function RootNavigator() {
             <Stack.Screen name="GuessGame" component={GuessGameScreen} options={{ title: 'Guess the Place' }} />
             <Stack.Screen name="Leaderboard" component={LeaderboardScreen} options={{ title: 'Leaderboard' }} />
 
-            {/* Admin lang (ikaw). Hindi man lang naka-register ang mga ito para sa viewers */}
             {isAdmin && (
               <>
                 <Stack.Screen name="AddDestination" component={AddDestinationScreen} options={{ title: 'Add Destination' }} />
@@ -93,15 +88,12 @@ export default function App() {
   useEffect(() => {
     const setup = async () => {
       try {
-        // magkakasunod, hintayin ang bawat isa
+
         await initDatabase();
-        //await seedSampleData();
-        //await seedPanoramaData();
       } catch (error) {
         console.error('Database setup error:', error);
       }
 
-      // hiwalay para hindi harangan ang app kung mag-error ito
       try {
         await updateDestinationsWithCoordinates();
       } catch (error) {
@@ -113,7 +105,6 @@ export default function App() {
     setup();
   }, []);
 
-  // Huwag i-render ang mga screen hangga't hindi pa handa ang database
   if (!dbReady || !minTimePassed) return <AppSplash />;
 
   return (

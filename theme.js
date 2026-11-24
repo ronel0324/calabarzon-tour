@@ -1,25 +1,23 @@
 import { Platform } from 'react-native';
 
-// Palette: hango sa Taal Lake (teal), sa araw ng watawat (ginto), at sa kulay ng Pahiyas
 export const COLORS = {
-  taal: '#0E3B43', // malalim na teal, pangunahing kulay at header
+  taal: '#0E3B43',
   taalSoft: '#1D5963',
-  tealTint: '#E2ECEE', // mapusyaw na teal para sa napiling item
-  paper: '#F5F6F1', // background ng mga screen
+  tealTint: '#E2ECEE',
+  paper: '#F5F6F1',
   white: '#FFFFFF',
   gold: '#D9A441',
   goldDeep: '#A87A1C',
-  vermilion: '#B8372F', // delete / error
+  vermilion: '#B8372F',
   vermilionTint: '#FBE9E7',
-  leaf: '#3F7D4E', // success / completed
+  leaf: '#3F7D4E',
   leafTint: '#E3EEE5',
-  ink: '#1D2A2E', // pangunahing teksto
-  muted: '#5C6A6D', // pangalawang teksto
-  neutral: '#6B787B', // cancel / close buttons
-  line: '#E1E3DA' // borders
+  ink: '#1D2A2E',
+  muted: '#5C6A6D',
+  neutral: '#6B787B',
+  line: '#E1E3DA'
 };
 
-// Serif para sa mga pamagat (heritage na dating)
 export const SERIF = Platform.select({
   ios: 'Georgia',
   android: 'serif',
@@ -27,7 +25,6 @@ export const SERIF = Platform.select({
   default: 'serif'
 });
 
-// Karaniwang card: puti, manipis na border, walang mabigat na anino
 export const card = {
   backgroundColor: COLORS.white,
   borderRadius: 14,

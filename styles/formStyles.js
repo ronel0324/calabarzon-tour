@@ -1,11 +1,10 @@
 import { StyleSheet } from 'react-native';
 import { COLORS } from '../theme';
 
-// Gamit ng AddDestinationScreen at EditDestinationScreen
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.taal // tugma sa header
+    backgroundColor: COLORS.taal
   },
   container: {
     flex: 1,
@@ -132,7 +131,7 @@ export default StyleSheet.create({
     alignItems: 'center',
     marginTop: 30,
     borderBottomWidth: 3,
-    borderBottomColor: COLORS.gold // gintong guhit sa ilalim ng pangunahing button
+    borderBottomColor: COLORS.gold
   },
   submitButtonText: {
     color: COLORS.white,

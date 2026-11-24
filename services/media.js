@@ -15,7 +15,6 @@ export const notify = (title, message) => {
 
 const FIELDS = 'id, user_id, media_type, url, storage_path, created_at';
 
-// Lahat ng media ng isang destination (galing sa lahat ng user)
 export async function fetchDestinationMedia(destinationId) {
   const { data, error } = await supabase
     .from('destination_media')
@@ -27,7 +26,7 @@ export async function fetchDestinationMedia(destinationId) {
   return data || [];
 }
 
-// Media ng user mismo (para sa Profile), kasama ang pangalan ng destination
+
 export async function fetchUserMedia(userId) {
   const { data, error } = await supabase
     .from('destination_media')
@@ -47,7 +46,6 @@ export async function uploadMedia({ asset, destinationId, userId }) {
     .replace('jpeg', 'jpg')
     .replace('quicktime', 'mov');
 
-  // Iba ang paraan ng pagbasa ng file depende sa platform
   let buffer;
   if (Platform.OS === 'web') {
     const res = await fetch(asset.uri);
@@ -60,7 +58,6 @@ export async function uploadMedia({ asset, destinationId, userId }) {
   }
   console.log('upload bytes:', buffer.byteLength, contentType);
 
-  // userId muna sa path para tugma sa storage policy
   const path = `${userId}/${destinationId}/${Date.now()}.${ext}`;
   const { error: uploadError } = await supabase.storage
     .from(BUCKET)
@@ -82,7 +79,6 @@ export async function uploadMedia({ asset, destinationId, userId }) {
     .single();
 
   if (error) {
-    // Burahin ang file kung hindi na-save ang record
     supabase.storage.from(BUCKET).remove([path]);
     throw error;
   }
@@ -99,7 +95,6 @@ export async function deleteMedia(item) {
   if (!data || data.length === 0) {
     throw new Error('Nothing was deleted. You can only delete your own media.');
   }
-  // Hindi mahalaga kung mabigo ang pagbura ng file
   const { data: removed, error: removeError } = await supabase.storage
     .from(BUCKET)
     .remove([item.storage_path]);

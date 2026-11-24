@@ -1,8 +1,6 @@
 import { StyleSheet } from 'react-native';
 import { COLORS, SERIF } from '../theme';
 
-// Ang kulay ng mga pin ay nasa categoryColors pa rin sa MapScreen.js (hindi ito ginagalaw).
-// Ang asul (#1976D2) ay ginagamit pa rin sa ruta/directions para tugma sa linya sa mapa.
 export default StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -66,7 +64,6 @@ export default StyleSheet.create({
     color: COLORS.white
   },
 
-  // Filter bar
   filterBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -172,7 +169,6 @@ export default StyleSheet.create({
     color: COLORS.taal
   },
 
-  // Route
   routeLoading: {
     position: 'absolute',
     top: 50,
@@ -251,7 +247,6 @@ export default StyleSheet.create({
     fontWeight: '600'
   },
 
-  // Legend
   legendContainer: {
     backgroundColor: COLORS.white,
     paddingTop: 10,
@@ -281,7 +276,6 @@ export default StyleSheet.create({
     color: COLORS.muted
   },
 
-  // Info modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(14, 59, 67, 0.55)',

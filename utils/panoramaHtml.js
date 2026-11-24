@@ -1,8 +1,5 @@
-// utils/panoramaHtml.js
-// Ginagamit ng PanoramaViewer.js (phone, WebView) at PanoramaViewer.web.js (browser, iframe).
-
 export const buildPanoramaHtml = ({ panoramaImage, hotspots = [], initialRotation = 0 }) => {
-  // hotspot_x / hotspot_y (0 to 1) -> yaw / pitch
+
   const spots = hotspots.map((h, i) => ({
     index: i,
     yaw: (h.hotspot_x - 0.5) * 360,
@@ -51,7 +48,6 @@ export const buildPanoramaHtml = ({ panoramaImage, hotspots = [], initialRotatio
     var ready = false;
     var appliedIds = [];
 
-    // Phone: ReactNativeWebView. Web: iframe -> parent window.
     function send(msg) {
       var s = JSON.stringify(msg);
       if (window.ReactNativeWebView) {
@@ -124,7 +120,6 @@ export const buildPanoramaHtml = ({ panoramaImage, hotspots = [], initialRotatio
       }
     }
 
-    // Phone: tinatawag ng injectJavaScript. Web: sa pamamagitan ng message sa ibaba.
     window.applyState = function (json) {
       state = JSON.parse(json);
       if (ready) render();
@@ -142,7 +137,6 @@ export const buildPanoramaHtml = ({ panoramaImage, hotspots = [], initialRotatio
       render();
     });
 
-    // Edit mode: tap/click (hindi drag) para pumili ng posisyon
     var pano = document.getElementById('pano');
     var down = null;
     pano.addEventListener('pointerdown', function (e) {
@@ -156,7 +150,7 @@ export const buildPanoramaHtml = ({ panoramaImage, hotspots = [], initialRotatio
       down = null;
       if (!quick) return;
       if (e.target && e.target.closest && e.target.closest('.pnlm-hotspot')) return;
-      var c = viewer.mouseEventToCoords(e); // [pitch, yaw]
+      var c = viewer.mouseEventToCoords(e);
       if (!c) return;
       send({ type: 'place', pitch: c[0], yaw: c[1] });
     }, true);
